@@ -8,6 +8,7 @@ class Neurone:
 	def __init__(self,weight_count,max):
 		self.weights=[]
 		self.weight_count=weight_count
+		self.win_count=0 #number of time a neuron win used for weighted mean when group neurons 
 		for i in range(self.weight_count):
 			self.weights.append(rnd.uniform(-max,max))
 	
@@ -31,7 +32,7 @@ class Neurone:
 		return math.sqrt(dist)
 		
 class Kohonen:
-	def __init__(self,row,col,weight_count,max_weight,alpha,neighbor,min_win,ext_img,save):
+	def __init__(self,row,col,weight_count,max_weight,alpha,neighbor,min_win,ext_img,save,show):
 		self.row=row
 		self.col=col
 		self.neighbor=neighbor
@@ -42,6 +43,7 @@ class Kohonen:
 		self.groups=[]
 		self.img_ext=ext_img
 		self.save=save
+		self.show=show
 		for c in range(self.col):
 			self.network.append([])
 			for r in range(self.row):
@@ -72,6 +74,7 @@ class Kohonen:
 			win_count.append([])
 			for r in range(self.row):
 				win_count[c].append(0)
+				self.network[c][r].win_count=0
 		self.good_neurons=[]
 		#count the number of time a neuron win
 		for obs in obs_list:
@@ -91,8 +94,9 @@ class Kohonen:
 						best_r=r
 						best_c=c
 			win_count[best_c][best_r]+=1
+			self.network[best_c][best_r].win_count+=1
 			
-		return win_count
+		return win_count			
 	
 	def compute_density(self,obs_list,elements_range):
 		dens=[]
@@ -128,12 +132,13 @@ class Kohonen:
 						self.groups.append(Group_neuron(self.network[c][r],len(self.groups)))
 				
 	def best_neurons(self,obs_list):
-		win_count=self.compute_win_count(obs_list)	
+		self.compute_win_count(obs_list)	
 		for c in range(self.col):
 			for r in range(self.row):
-				if win_count[c][r] > self.min_win:
+				if self.network[c][r].win_count > self.min_win:
 					self.good_neurons.append(self.network[c][r])
-					
+		return self.good_neurons
+			
 	def group_neurons(self,obs_list,dist_threshold):
 		self.groups=[]
 		list_n=copy.copy(self.good_neurons)
@@ -147,6 +152,8 @@ class Kohonen:
 			
 			dist_n2_gpe,best_gpe_n2 = self.find_closest_group(n2)
 			self.classify_neuron(list_n,n2,dist_n2_gpe,best_gpe_n2,dist_threshold)
+			
+		print('groups found: '+str(len(self.groups)))
 	
 	def find_closest_neurons(self,list_n):
 		first=True
@@ -191,7 +198,7 @@ class Kohonen:
 		else:
 			#if neuron is close to one group add it to this group else create a new group
 			if dist_neuron_gpe < dist_threshold:
-				self.groups[best_gpe_neuron].add(neuron)
+				self.groups[best_gpe_neuron].add_neuron(neuron)
 				list_n.remove(neuron)
 			else:
 				self.groups.append(Group_neuron(neuron,len(self.groups)))
@@ -206,7 +213,9 @@ class Kohonen:
 				plt.plot(range(len(w)),w)
 		if self.save:
 			plt.savefig('all_neurons_weights'+extra_text+self.img_ext, bbox_inches='tight')
-				
+		if not self.show:
+			plt.close()
+			
 	def plot_best_neurons(self,extra_text=''):
 		plt.figure()
 		plt.suptitle('best neurons weights'+extra_text)
@@ -215,16 +224,21 @@ class Kohonen:
 			plt.plot(range(len(w)),w)
 		if self.save:
 			plt.savefig('best_neurons_weights'+extra_text+self.img_ext, bbox_inches='tight')
-	
-	def plot_groups(self,extra_text=''):
-		plt.figure()	
-		plt.suptitle('group weights'+extra_text)
-		for gpe in self.groups:
-			w=gpe.template
-			plt.plot(range(len(w)),w,color=gpe.color)
-		if self.save:
-			plt.savefig('group_weights'+extra_text+self.img_ext, bbox_inches='tight')
+		if not self.show:
+			plt.close()
 			
+	def plot_groups(self,extra_text=''):
+		if len(self.groups)!=0:
+			plt.figure()	
+			plt.suptitle('group weights'+extra_text)
+			for gpe in self.groups:
+				w=gpe.template
+				plt.plot(range(len(w)),w,color=gpe.color)
+			if self.save:
+				plt.savefig('group_weights'+extra_text+self.img_ext, bbox_inches='tight')
+			if not self.show:
+				plt.close()
+				
 	def plot_spikes_classified(self,spikes_values,spike_count,threshold_template,extra_text=''):
 		s=copy.copy(spikes_values).tolist()
 		if spike_count>len(s):
@@ -239,58 +253,92 @@ class Kohonen:
 			r=rnd.randrange(len(s))
 			value=s.pop(r)
 			
-			#find best gpe
-			best_dist=threshold_template
-			for gpe in self.groups:
-				dist=gpe.dist(value)
-				if dist<best_dist:
-					color_gpe=gpe.color
-					best_dist=dist
-			
+			best_gpe=self.find_best_group(value,threshold_template)
+			if best_gpe is None:
+				color_gpe=(0,0,0)
+			else:
+				color_gpe=best_gpe.color
+				
 			plt.plot(range(len(value)),value,color=color_gpe)
 		
 		if self.save:
 			plt.savefig('spikes_classified'+extra_text+self.img_ext, bbox_inches='tight')
-	
-	def evaluate_group(self,spikes_values,iteration_count,threshold_template,threshold_count):
-		win_count=[]
+		if not self.show:
+			plt.close()
+	def find_best_group(self,obs,threshold_template):	
+		best_dist=threshold_template
+		best_gpe=None
 		for gpe in self.groups:
-			win_count.append(0)
+			dist=gpe.dist(obs)
+			if dist<best_dist:
+				best_gpe=gpe
+				best_dist=dist
+		return best_gpe
+		
+	def evaluate_group(self,spikes_values,threshold_template,threshold_count):
+		self.compute_groups_stat(spikes_values,threshold_template)
+		tmp=[]
+		for gpe in self.groups:
+			if len(gpe.spikes)>threshold_count:
+				tmp.append(gpe)
+		self.groups=tmp
+		
+		
+		print('groups found: '+str(len(self.groups)))
+	
+	def compute_groups_stat(self,obs,dist_thresh):
+		for spike in obs:
+			gpe=self.find_best_group(spike,dist_thresh)
+			if not(gpe is None):
+				gpe.add_spike(spike)
+	
+	def plot_groups_stat(self,extra_text=''):
+		if len(self.groups)!=0:
+			plt.figure()
 			
-		for i in range(iteration_count):
-			#select a spike randomly
-			r=rnd.randrange(spikes_values.shape[0])
-			value=spikes_values[r]
-			#find best gpe
-			best_dist=threshold_template
-			best_gpe=len(self.groups)
-			for gpe in range(len(self.groups)):
-				dist=self.groups[gpe].dist(value)
-				if dist<best_dist:
-					best_gpe=gpe
-					best_dist=dist
-			if not best_gpe==len(self.groups):
-				win_count[best_gpe]+=1
-		
-		for i in range(len(win_count)):
-			if win_count[i]<threshold_count:
-				del self.groups[i]
-		
+			for gpe in self.groups:
+				x=range(gpe.template.shape[0])
+				plt.plot(x,gpe.mean(),color=gpe.color)
+				plt.plot(x,gpe.mean()-gpe.std(),'--',color=gpe.color)
+				plt.plot(x,gpe.mean()+gpe.std(),'--',color=gpe.color)
+			if self.save:
+				plt.savefig('groups_mean_std'+extra_text+self.img_ext, bbox_inches='tight')
+			if not self.show:
+				plt.close()
+				
 class Group_neuron:
 	def __init__(self,neuron,gpe_count):
 		plot_color=['r','g','b','m','c','y']
 		self.neurons=[neuron]
-		self.weights_matrix=np.array(neuron.weights)
-		self.template=self.weights_matrix
+		self.template=np.array(neuron.weights)
 		self.color=plot_color[gpe_count%len(plot_color)]
+		self.number=gpe_count
+		self.spikes=[]
 	
-	def add(self,neuron):
+	def add_neuron(self,neuron):
 		self.neurons.append(neuron)
-		self.weights_matrix=np.vstack((self.weights_matrix,neuron.weights))
-		self.template=self.weights_matrix.mean(0)
+		self.compute_template()
 	
+	def compute_template(self):
+		sum=self.template*0
+		count=0
+		for n in self.neurons:
+			sum+=np.array(n.weights)*n.win_count
+			count+=n.win_count
+		self.template=sum/count
+		
 	def dist(self,val):
 		dist=0
 		for i in range(len(self.template)):
 			dist+=(self.template[i]-val[i])**2
 		return math.sqrt(dist)
+	
+	def add_spike(self,spike):
+		self.spikes.append(spike)
+		
+	def std(self):
+		return np.array(self.spikes).std(0)
+		
+		
+	def mean(self):
+		return np.array(self.spikes).mean(0)

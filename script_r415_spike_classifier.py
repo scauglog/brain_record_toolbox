@@ -2,9 +2,9 @@ import signal_processing as sig_proc
 import pickle
 
 img_ext='.png'
-save_img=True
-show=False
-save_obj=True
+save_img=False
+show=True
+save_obj=False
 
 #signal filtering parameter
 low_cut=3e2
@@ -32,7 +32,7 @@ min_clus_rel = 0.01; 	#minimum cluster size (relative value)
 sp=sig_proc.Signal_processing(save_img,show,img_ext)
 
 #load signal and sampling frequency
-signal=sp.load_m('r415_130926.mat','d')#load multichannel signal
+signal=sp.load_m('r415_131009.mat','d')#load multichannel signal
 fs=float(sp.load_m('fech.mat','sampFreq')) #load sample frequency
 
 fsignal=sp.signal_mc_filtering(signal,low_cut,high_cut,fs)
@@ -59,10 +59,10 @@ for chan in range(fsignal.shape[0]):
 	#koho.plot_groups('_channel_'+str(chan+1))
 	koho.plot_spikes_classified(spikes_values,20,2*dist_thresh,'_channel_'+str(chan+1))
 
-	gpe_list=[]
-	for gpe in koho.groups:
-		gpe_list.append(gpe.template)
-	all_chan_templates.append(gpe_list)
+	# gpe_list=[]
+	# for gpe in koho.groups:
+		# gpe_list.append(gpe.template)
+	all_chan_templates.append(koho.groups)
 
 if show:	
 	sp.show_plot()

@@ -16,10 +16,12 @@ class Signal_processing:
 		self.show=show
 		self.img_ext=img_ext
 	#filter a multichannel signal
-
+	
+	#load matlab matrix
 	def load_m(self,filename,var_name):
 		return scipy.io.loadmat(filename)[var_name]
-
+	
+	#filter multichannel filter subtract col mean -> butterworth -> zscore
 	def signal_mc_filtering(self,signal,lowcut,highcut,fs):
 		print('\n### signal filtering ###')
 		mean=signal.mean(0) #mean of each column
@@ -41,6 +43,7 @@ class Signal_processing:
 			plt.savefig('signal_after_filtering'+self.img_ext, bbox_inches='tight')
 		if not self.show:
 			plt.close()
+	#find spikes by threshold
 	def find_spikes(self,signal,a_spike,b_spike,tresh):
 		print('\n find spike')
 		cpt=0
@@ -60,7 +63,7 @@ class Signal_processing:
 			cpt+=1
 		spikes_values=np.array(spikes_values) #can't use directly np.array because it raise an error for first spike (empty array)
 		return spikes_values,spikes_time
-		
+	
 	def smooth_spikes(self,spikes_values,window_size):
 		s=[]
 		window = np.ones(int(window_size))/float(window_size)
@@ -69,26 +72,33 @@ class Signal_processing:
 			s.append(np.convolve(val,window,'same'))
 		return np.array(s)
 		
-	def classify_spikes(self,spikes_values,templates,threshold_template):
+	def classify_spikes(self,spikes_values,spikes_time,clusters,threshold_template):
 		spikes_classes=[]
-		for val in spikes_values:
-			gpe=-1
-			
-			#find best template
-			best_dist=threshold_template
-			for i in range(len(templates)):
-				#compute dist
-				dist=0
-				for j in range(len(template[i])):
-					dist+=(self.template[j]-val[j])**2
-				dist=math.sqrt(dist)
-				#check if dist is better than previous
-				if dist<best_dist:
-					color_gpe=i
-					best_dist=dist
-					
-			spikes_classes.append(gpe)
+		classed_count=0
+		for i in range(len(spikes_time)):
+			best_clus=self.find_best_cluster(spikes_values[i],clusters,threshold_template)
+			if best_clus!=None:
+				best_clus.add_spike(spikes_values[i],spikes_time[i])	
+				classed_count+=1
+				spikes_classes.append(best_clus.number)
+			else:
+				spikes_classes.append(-1)
+		print ('spike classified: '+str(classed_count))
+		print ('spike unclassified: '+str(len(spikes_values)-classed_count))
 		return spikes_classes
+	
+	def find_best_cluster(self,obs,clusters,threshold_template):
+		best_dist=threshold_template
+		best_clus=None
+		for clus in clusters:
+			#compute dist
+			dist=clus.dist(obs)
+			#check if dist is better than previous
+			if dist<best_dist:
+				best_clus=clus
+				best_dist=dist
+		return best_clus
+		
 	def plot_spikes(self,spikes_values,spike_count,extra_text=''):
 		s=copy.copy(spikes_values).tolist()
 		if spike_count>len(s):
@@ -105,10 +115,29 @@ class Signal_processing:
 			plt.savefig('spikes_find'+extra_text+self.img_ext, bbox_inches='tight')
 		if not self.show:
 			plt.close()
-			
+	
+	def plot_signal_spikes_classified(self,spikes_time,spikes_classes,extra_text=''):
+		plt.figure()
+		graph_x=[0]
+		graph_y=[0]
+		for i in range(len(spikes_time)):
+			graph_x.append(spikes_time[i])
+			graph_y.append(0)
+			graph_x.append(spikes_time[i])
+			graph_y.append(spikes_classes[i])
+			graph_x.append(spikes_time[i])
+			graph_y.append(0)
+		plt.plot(graph_x,graph_y)
+	
+		if self.save:
+			plt.savefig('signal_spikes'+extra_text+self.img_ext, bbox_inches='tight')
+		if not self.show:
+			plt.close()
+
 	def show_plot(self):
 		plt.show()
-		
+	
+	#find the pattern of spikes using mode	
 	def find_spike_template_mode(self,spikes_values):
 		print('\n## find mode ##')
 		self.spike_mode=[]
@@ -118,7 +147,7 @@ class Signal_processing:
 			spike_mode.append(med[tmp])
 
 		return self.spike_mode
-	
+	#find patterns of spikes using kohonen network
 	def find_spike_template_kohonen(self,spikes_values,col,row,weight_count,max_weight,alpha,neighbor,min_win,dist_treshold,ext_img,save,show):
 		print('\n## kohonen ##')
 		
@@ -138,15 +167,43 @@ class Signal_processing:
 		self.map.group_neurons(spikes_values,dist_treshold)
 		#self.map.find_cluster_center(spikes_values,20)
 		return self.map
-		
+	
+	#compute parameters for butterworth filter
 	def butter_bandpass(self,lowcut, highcut, fs, order):
 		nyq = 0.5 * fs
 		low = lowcut / nyq
 		high = highcut / nyq
 		b, a = butter(order, [low, high], btype='band')
 		return b, a
-
+		
+	#filter signal using butterworth filter and filtfilt
 	def butter_bandpass_filter(self,data, lowcut, highcut, fs, order):
 		b, a = self.butter_bandpass(lowcut, highcut, fs, order)
 		y = filtfilt(b, a, data)
 		return y
+		
+#store spikes values and time that match a specific template
+class Spikes_cluster:
+	def __init__(self,template,number):
+		self.template=template
+		self.spikes_values=[]
+		self.spikes_time=[]
+		self.number=number
+		
+	def dist(self,val):
+		dist=0
+		for i in range(len(self.template)):
+			dist+=(self.template[i]-val[i])**2
+		return math.sqrt(dist)
+		
+	def add_spike(self,values,time):
+		self.spikes_values.append(values)
+		self.spikes_time.append(time)
+		
+	def compute_delta_time(self):
+		l1=copy.copy(self.spikes_time)
+		l2=copy.copy(self.spikes_time)
+		del l1[-1]
+		del l2[0]
+		self.delta_time=np.array(l2)-np.array(l1)
+		return self.delta_time

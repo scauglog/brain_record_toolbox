@@ -1,9 +1,10 @@
+%original file here : http://www.vis.caltech.edu/~rodri/Wave_clus/Wave_clus_home.htm
 clear all;
 clc;
 
-filename='r415_130926'
-load('r415_130926.mat')
-load('fech.mat')
+dir_name='../../data/r415/'
+load(strcat(dir_name,'r415_130926.mat'))
+load(strcat(dir_name,'fech.mat'))
 
 signal=d;
 clear d;
@@ -173,7 +174,7 @@ for chan = 1:channel_count
 		plot(template(5,:)+template_std(5,:),['c' '--']);  %plot mean + sd
 		plot(template(5,:)-template_std(5,:),['c' '--']);  %plot mean - sd
 	end
-	saveas(img,num2str(chan),img_ext);
+	saveas(img,strcat(dir_name,'quiroga_cluster_chan_',num2str(chan)),img_ext);
 	all_templates{chan,1}=template
 	all_templates_std{chan,1}=template_std
 end

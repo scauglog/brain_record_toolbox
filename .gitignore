@@ -1,9 +1,9 @@
-.pyc
+*.pyc
 
-.png
-.fig
-.eps
-.jpeg
+*.png
+*.fig
+*.eps
+*.jpeg
 
-.mat
-.csv
+*.mat
+*.csv

@@ -63,8 +63,7 @@ class Signal_processing:
                     spikes_time.append(cpt - a_spike)
                     last_spike = cpt
             cpt += 1
-        spikes_values = np.array(
-            spikes_values) #can't use directly np.array because it raise an error for first spike (empty array)
+        spikes_values = np.array(spikes_values) #can't use directly np.array because it raise an error for first spike (empty array)
         return spikes_values, spikes_time
 
     def smooth_spikes(self, spikes_values, window_size):
@@ -147,7 +146,7 @@ class Signal_processing:
         for col in spikes_values.transpose():
             values, med = np.histogram(col, bins=15)
             tmp = values.argmax()
-            spike_mode.append(med[tmp])
+            self.spike_mode.append(med[tmp])
 
         return self.spike_mode
 

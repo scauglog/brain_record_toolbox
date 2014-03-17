@@ -39,7 +39,7 @@ class Signal_processing:
 
     def plot_signal(self, signal):
         plt.figure('signal after filtering')
-        plt.suptitle()
+        plt.suptitle('')
         plt.plot(range(signal.shape[0]), signal)
         if self.save:
             plt.savefig('signal_after_filtering' + self.img_ext, bbox_inches='tight')
@@ -225,7 +225,7 @@ class Signal_processing:
             cpt += 1
         return dict
 
-    def synch_vicon_with_TDT(self,dict):
+    def synch_vicon_with_TDT(self,dict,TDT_padding=0):
         #synchronise vicon data with the beginning of the TDT
         events=['Foot Strike', 'Foot Off', 'Event']
         context=['Right', 'Left', 'General']
@@ -233,6 +233,7 @@ class Signal_processing:
             for e in events:
                 for time in dict[c][e]:
                     time-= dict['sync'] / dict['fq']
+                    time+= TDT_padding
 
                 dict[c][e] = sorted(dict[c][e])
         return dict

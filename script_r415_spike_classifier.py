@@ -75,3 +75,6 @@ if save_obj:
     with open(dir_name + 'templates', 'wb') as my_file:
         my_pickler = pickle.Pickler(my_file)
         my_pickler.dump(all_chan_templates)
+
+print('\n\n#################')
+print('####   END   ####')

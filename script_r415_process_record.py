@@ -73,3 +73,6 @@ if save_obj:
     with open(dir_name + 'data_processed', 'wb') as my_file:
         my_pickler = pickle.Pickler(my_file)
         my_pickler.dump(record_data)
+
+print('\n\n#################')
+print('####   END   ####')

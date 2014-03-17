@@ -8,6 +8,7 @@ from scipy import stats #for zscore calc
 import copy #used for list copy same pb as ruby
 import kohonen_neuron as nn
 import random as rnd #used for plotting spike
+import csv
 
 
 class Signal_processing:
@@ -185,6 +186,57 @@ class Signal_processing:
         b, a = self.butter_bandpass(lowcut, highcut, fs, order)
         y = filtfilt(b, a, data)
         return y
+
+    def load_csv(self, filename):
+        csvfile = open(filename, 'rb')
+        return csv.reader(csvfile, delimiter=',', quotechar='"')
+
+    def vicon_extract(self,data,dict={}):
+        events=['Foot Strike', 'Foot Off', 'Event']
+        context=['Right', 'Left', 'General']
+        events_extraction = False #flag for events extraction
+        sync_extraction = False #flag for sync extraction
+        cpt = 0
+        #if no dictionnary is passed create a new dict
+        if context[0] not in dict:
+            for c in context:
+                dict[c]={}
+                for e in events:
+                    dict[c][e]=[]
+            dict['fq'] = 0 #store frequency sampling
+            dict['sync'] = 0 #store beginning of the TDT
+        for row in data:
+            if len(row) == 0: #when there is a row with no data means we are at the end of data set for this kind of data
+                events_extraction = False
+                sync_extraction = False
+            elif len(row) == 1 and row[0] == 'EVENTS':
+                events_extraction = True
+                cpt = -1 #ignore header
+            elif len(row) == 1 and row[0] == 'ANALOG':
+                sync_extraction = True
+                cpt = -3 #ignore the 4th first line containing sampling frequency and header
+            elif events_extraction and cpt > 0:#add time events to the correct list
+                dict[row[1]][row[2]].append(float(row[3]))
+            elif sync_extraction and cpt == -2:
+                dict['fq'] = float(row[0])
+            elif sync_extraction and cpt > 0 and float(row[11]) > 1:
+                dict['sync'] = float(row[0])
+                break
+            cpt += 1
+        return dict
+
+    def synch_vicon_with_TDT(self,dict):
+        #synchronise vicon data with the beginning of the TDT
+        events=['Foot Strike', 'Foot Off', 'Event']
+        context=['Right', 'Left', 'General']
+        for c in context:
+            for e in events:
+                for time in dict[c][e]:
+                    time-= dict['sync'] / dict['fq']
+
+                dict[c][e] = sorted(dict[c][e])
+        return dict
+
 
 #store spikes values and time that match a specific template
 class Spikes_cluster:

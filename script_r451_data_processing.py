@@ -93,7 +93,7 @@ for trial in range(trial_first, trial_last + 1):
                     end_move.append(float(row[3]))
             elif sync_extraction and cpt == -2:
                 fq = float(row[0])
-            elif sync_extraction and cpt > 0 and row[11] > 1:
+            elif sync_extraction and cpt > 0 and float(row[11]) > 1:
                 sync = cpt
                 break
             cpt += 1

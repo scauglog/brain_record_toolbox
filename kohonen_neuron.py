@@ -54,7 +54,7 @@ class Kohonen:
 
     def algo_kohonen(self, obs_list):
         for obs in obs_list:
-            minerror = 1e6;
+            minerror = 1e6
             best_r = 0
             best_c = 0
             for c in range(self.col):
@@ -66,7 +66,7 @@ class Kohonen:
                         best_c = c
             for c in range(best_c - self.neighbor, best_c + self.neighbor):
                 for r in range(best_r - self.neighbor, best_r + self.neighbor):
-                    if c >= 0 and r >= 0 and c < self.col and r < self.row:
+                    if 0 <= c < self.col and 0 <= r < self.row:
                         dist = 1.0 + abs(best_c - c) + abs(best_r - r)
                         self.network[c][r].change_weights(dist, obs, self.alpha)
 
@@ -81,9 +81,9 @@ class Kohonen:
         self.good_neurons = []
         #count the number of time a neuron win
         for obs in obs_list:
-            minerror = 0;
-            best_r = 0;
-            best_c = 0;
+            minerror = 0
+            best_r = 0
+            best_c = 0
             first = True
             for c in range(self.col):
                 for r in range(self.row):
@@ -122,15 +122,15 @@ class Kohonen:
         dens = self.compute_density(obs_list, elements_range)
         for c in range(self.col):
             for r in range(self.row):
-                if c > 0 and c < (self.col - 1) and (self.row < 3):
+                if 0 < c < (self.col - 1) and (self.row < 3):
                     if (dens[c][r] < dens[c - 1][r]) and (dens[c][r] < dens[c + 1][r]):
                         self.groups.append(Group_neuron(self.network[c][r], len(self.groups)))
 
-                if r > 0 and r < (self.row - 1) and (self.col < 3):
+                if 0 < r < (self.row - 1) and (self.col < 3):
                     if (dens[c][r] < dens[c][r - 1]) and (dens[c][r] < dens[c][r + 1]):
                         self.groups.append(Group_neuron(self.network[c][r], len(self.groups)))
 
-                if r > 0 and r < (self.row - 1) and c > 0 and c < (self.col - 1) and self.col > 2 and self.row > 2:
+                if 0 < r < (self.row - 1) and 0 < c < (self.col - 1) and self.col > 2 and self.row > 2:
                     if (dens[c][r] < dens[c - 1][r]) and (dens[c][r] < dens[c + 1][r]) and (
                         dens[c][r] < dens[c][r - 1]) and (dens[c][r] < dens[c][r + 1]):
                         self.groups.append(Group_neuron(self.network[c][r], len(self.groups)))
@@ -325,12 +325,12 @@ class Group_neuron:
         self.compute_template()
 
     def compute_template(self):
-        sum = self.template * 0
+        sum_template = self.template * 0
         count = 0
         for n in self.neurons:
-            sum += np.array(n.weights) * n.win_count
+            sum_template += np.array(n.weights) * n.win_count
             count += n.win_count
-        self.template = sum / count
+        self.template = sum_template / count
 
     def dist(self, val):
         dist = 0

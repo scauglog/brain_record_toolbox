@@ -1,12 +1,12 @@
-import scipy.io  #open matlab file
+import scipy.io
 import matplotlib.pyplot as plt
-import math  #abs value
-import numpy as np  #array and arange
+import math
+import numpy as np
 from scipy.signal import butter, filtfilt
-from scipy import stats  #for zscore calc
-import copy  #used for list copy same pb as ruby
+from scipy import stats
+import copy
 import kohonen_neuron as nn
-import random as rnd  #used for plotting spike
+import random as rnd
 import csv
 
 
@@ -25,8 +25,10 @@ class Signal_processing:
     #filter multichannel filter subtract col mean -> butterworth -> zscore
     def signal_mc_filtering(self, signal, lowcut, highcut, fs):
         print('\n### signal filtering ###')
-        mean = signal.mean(0)  #mean of each column
-        mean = np.tile(mean, (signal.shape[0], 1))  #duplicate matrix for each row
+        #mean of each column
+        mean = signal.mean(0)
+        #duplicate matrix for each row
+        mean = np.tile(mean, (signal.shape[0], 1))
         signal -= mean
 
         #apply butterworth filter and zscore
@@ -50,21 +52,22 @@ class Signal_processing:
         print('\n find spike')
         cpt = 0
         last_spike = 0
-        list = []
+        list_spike = []
         spikes_values = []
         spikes_time = []
         for i in signal:
             #list store x (x=size of the spike length) values of signal
-            list.append(i)
-            if len(list) > (a_spike + b_spike):
-                del list[0]
-                if list[b_spike] < tresh and (cpt - last_spike) > a_spike:  #and list[b_spike]<list[b_spike+1]:
-                    spikes_values.append(copy.copy(list))
+            list_spike.append(i)
+            if len(list_spike) > (a_spike + b_spike):
+                del list_spike[0]
+                #if list_spike[b_spike] < tresh and (cpt - last_spike) > a_spike and list_spike[b_spike]<list_spike[b_spike+1]:
+                if list_spike[b_spike] < tresh and (cpt - last_spike) > a_spike:
+                    spikes_values.append(copy.copy(list_spike))
                     spikes_time.append(cpt - a_spike)
                     last_spike = cpt
             cpt += 1
-        spikes_values = np.array(
-            spikes_values)  #can't use directly np.array because it raise an error for first spike (empty array)
+        #can't use directly np.array because it raise an error for first spike (empty array)
+        spikes_values = np.array(spikes_values)
         return spikes_values, spikes_time
 
     def smooth_spikes(self, spikes_values, window_size):
@@ -80,7 +83,7 @@ class Signal_processing:
         classed_count = 0
         for i in range(len(spikes_time)):
             best_clus = self.find_best_cluster(spikes_values[i], clusters, threshold_template)
-            if best_clus != None:
+            if best_clus is not None:
                 best_clus.add_spike(spikes_values[i], spikes_time[i])
                 classed_count += 1
                 spikes_classes.append(best_clus.number)
@@ -144,36 +147,30 @@ class Signal_processing:
     #find the pattern of spikes using mode
     def find_spike_template_mode(self, spikes_values):
         print('\n## find mode ##')
-        self.spike_mode = []
+        spike_mode = []
         for col in spikes_values.transpose():
             values, med = np.histogram(col, bins=15)
             tmp = values.argmax()
-            self.spike_mode.append(med[tmp])
+            spike_mode.append(med[tmp])
 
-        return self.spike_mode
+        return spike_mode
 
     #find patterns of spikes using kohonen network
     def find_spike_template_kohonen(self, spikes_values, col, row, weight_count, max_weight, alpha, neighbor, min_win,
                                     dist_treshold):
         print('\n## kohonen ##')
 
-        self.map = nn.Kohonen(col, row, weight_count, max_weight, alpha, neighbor, min_win, self.img_ext, self.save_img,
-                              self.show)
-        iteration_count = 0
-        i = 0
-        #while iteration_count<2000:
-        #	print(i)
-        iteration_count += spikes_values.shape[0]
-        i += 1
-        self.map.algo_kohonen(spikes_values)
+        koho_map = nn.Kohonen(col, row, weight_count, max_weight, alpha, neighbor, min_win, self.img_ext, self.save_img,
+                         self.show)
+        koho_map.algo_kohonen(spikes_values)
 
         print('# find best neurons #')
-        self.map.best_neurons(spikes_values)
+        koho_map.best_neurons(spikes_values)
 
         print('# group neurons #')
-        self.map.group_neurons(spikes_values, dist_treshold)
-        #self.map.find_cluster_center(spikes_values,20)
-        return self.map
+        koho_map.group_neurons(dist_treshold)
+        #koho_map.find_cluster_center(spikes_values,20)
+        return koho_map
 
     #compute parameters for butterworth filter
     def butter_bandpass(self, lowcut, highcut, fs, order):
@@ -183,7 +180,7 @@ class Signal_processing:
         b, a = butter(order, [low, high], btype='band')
         return b, a
 
-    #filter signal using butterworth filter and filtfilt
+    #filter signal using Butterworth filter and filtfilt
     def butter_bandpass_filter(self, data, lowcut, highcut, fs, order):
         b, a = self.butter_bandpass(lowcut, highcut, fs, order)
         y = filtfilt(b, a, data)
@@ -193,66 +190,73 @@ class Signal_processing:
         csvfile = open(filename, 'rb')
         return csv.reader(csvfile, delimiter=',', quotechar='"')
 
-    def vicon_extract(self, data, dict={}):
+    def vicon_extract(self, data, vicon_dict={}):
         events = ['Foot Strike', 'Foot Off', 'Event']
         context = ['Right', 'Left', 'General']
-        events_extraction = False  #flag for events extraction
-        sync_extraction = False  #flag for sync extraction
+        #change to true when we are in events extraction
+        events_extraction = False
+        #change to true when we are in synch extraction
+        sync_extraction = False
         cpt = 0
         #if no dictionnary is passed create a new dict
-        if context[0] not in dict:
+        if context[0] not in vicon_dict:
             for c in context:
-                dict[c] = {}
+                vicon_dict[c] = {}
                 for e in events:
-                    dict[c][e] = []
-            dict['fq'] = 0  #store frequency sampling
-            dict['sync'] = 0  #store beginning of the TDT
+                    vicon_dict[c][e] = []
+            #store frequency sampling for TDT data
+            vicon_dict['fs'] = 0
+            #store beginning of the TDT
+            vicon_dict['synch'] = 0
         for row in data:
-            if len(
-                    row) == 0:  #when there is a row with no data means we are at the end of data set for this kind of data
+            #when there is a row with no data means we are at the end of data set for this kind of data
+            if len(row) == 0:
                 events_extraction = False
                 sync_extraction = False
             elif len(row) == 1 and row[0] == 'EVENTS':
                 events_extraction = True
-                cpt = -1  #ignore header
+                #ignore header so -1
+                cpt = -1
             elif len(row) == 1 and row[0] == 'ANALOG':
                 sync_extraction = True
-                cpt = -3  #ignore the 4th first line containing sampling frequency and header
-            elif events_extraction and cpt > 0:  #add time events to the correct list
-                dict[row[1]][row[2]].append(float(row[3]))
+                #ignore the 4th first line containing sampling frequency and header
+                cpt = -3
+            #add time events to the correct list
+            elif events_extraction and cpt > 0:
+                vicon_dict[row[1]][row[2]].append(float(row[3]))
             elif sync_extraction and cpt == -2:
-                dict['fq'] = float(row[0])
+                vicon_dict['fs'] = float(row[0])
             elif sync_extraction and cpt > 0 and float(row[11]) > 1:
-                dict['sync'] = float(row[0])
+                vicon_dict['synch'] = float(row[0])
                 break
             cpt += 1
-        return dict
+        return vicon_dict
 
-    def synch_vicon_with_TDT(self, dict, TDT_padding=0):
+    def synch_vicon_with_TDT(self, vicon_dict, TDT_padding=0):
         #synchronise vicon data with the beginning of the TDT
         events = ['Foot Strike', 'Foot Off', 'Event']
         context = ['Right', 'Left', 'General']
         for c in context:
             for e in events:
-                for time in dict[c][e]:
-                    time -= dict['sync'] / dict['fq']
+                for time in vicon_dict[c][e]:
+                    time -= vicon_dict['synch'] / vicon_dict['fs']
                     time += TDT_padding
 
-                dict[c][e] = sorted(dict[c][e])
-        return dict
+                vicon_dict[c][e] = sorted(vicon_dict[c][e])
+        return vicon_dict
 
     def binarise_vicon_step(self, steps):
-        time = [0]
-        bin = [0]
+        step_time = [0]
+        step_bin = [0]
         for val in steps:
-            time.append(val)
-            bin.append(0)
-            time.append(val)
-            bin.append(1)
-            time.append(val)
-            bin.append(0)
+            step_time.append(val)
+            step_bin.append(0)
+            step_time.append(val)
+            step_bin.append(1)
+            step_time.append(val)
+            step_bin.append(0)
 
-        return time, bin
+        return step_time, step_bin
 
     def fire_rate(self, all_chan_clusters, length_signal, fs, block_duration):
         global_fire = []
@@ -321,6 +325,7 @@ class Spikes_cluster:
         self.spikes_values = []
         self.spikes_time = []
         self.number = number
+        self.delta_time = []
 
     def dist(self, val):
         dist = 0

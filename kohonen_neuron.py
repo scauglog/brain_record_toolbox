@@ -2,27 +2,28 @@ import random as rnd
 import math
 import matplotlib.pyplot as plt
 import numpy as np
-import copy #used for list copy same pb as ruby
+import copy
 
 
 class Neurone:
-    def __init__(self, weight_count, max):
+    def __init__(self, weight_count, max_rnd):
         self.weights = []
         self.weight_count = weight_count
-        self.win_count = 0 #number of time a neuron win used for weighted mean when group neurons
+        #number of time a neuron win used for weighted mean when group neurons
+        self.win_count = 0
         for i in range(self.weight_count):
-            self.weights.append(rnd.uniform(-max, max))
+            self.weights.append(rnd.uniform(-max_rnd, max_rnd))
 
     def calc_error(self, obs):
-        sum = 0
+        error_sum = 0
         for i in range(self.weight_count):
-            sum += (self.weights[i] - obs[i]) ** 2
-        return math.sqrt(sum)
+            error_sum += (self.weights[i] - obs[i]) ** 2
+        return math.sqrt(error_sum)
 
     def change_weights(self, dist, obs, alpha):
         for i in range(self.weight_count):
-            self.weights[i] -= alpha * (
-            (self.weights[i] - obs[i]) * 1 / dist) #if the neuron is not the best neuron dist>1
+            #if the neuron is not the best neuron dist > 1, dist is the neighbor distance
+            self.weights[i] -= alpha * ((self.weights[i] - obs[i]) * 1 / dist)
 
     def interneuron_dist(self, n2):
         return self.weights_dist(n2.weights)
@@ -114,10 +115,12 @@ class Kohonen:
                 if len(list_dist) > elements_range:
                     elements_range = len(list_dist)
                 list_dist = list_dist[0:elements_range]
-
-                dens[c].append(reduce(lambda x, y: x + y, list_dist) / len(list_dist)) #store mean of dist
+                #store mean of dist
+                dens[c].append(reduce(lambda x, y: x + y, list_dist) / len(list_dist))
         return dens
 
+    #compute density to find center of the cluster.
+    #TODO better way to find cluster center using density
     def find_cluster_center(self, obs_list, elements_range):
         dens = self.compute_density(obs_list, elements_range)
         for c in range(self.col):
@@ -131,8 +134,7 @@ class Kohonen:
                         self.groups.append(Group_neuron(self.network[c][r], len(self.groups)))
 
                 if 0 < r < (self.row - 1) and 0 < c < (self.col - 1) and self.col > 2 and self.row > 2:
-                    if (dens[c][r] < dens[c - 1][r]) and (dens[c][r] < dens[c + 1][r]) and (
-                        dens[c][r] < dens[c][r - 1]) and (dens[c][r] < dens[c][r + 1]):
+                    if (dens[c][r] < dens[c - 1][r]) and (dens[c][r] < dens[c + 1][r]) and (dens[c][r] < dens[c][r - 1]) and (dens[c][r] < dens[c][r + 1]):
                         self.groups.append(Group_neuron(self.network[c][r], len(self.groups)))
 
     def best_neurons(self, obs_list):
@@ -143,7 +145,7 @@ class Kohonen:
                     self.good_neurons.append(self.network[c][r])
         return self.good_neurons
 
-    def group_neurons(self, obs_list, dist_threshold):
+    def group_neurons(self, dist_threshold):
         self.groups = []
         list_n = copy.copy(self.good_neurons)
         while not len(list_n) < 2:
@@ -163,6 +165,7 @@ class Kohonen:
         first = True
         best_n1 = 0
         best_n2 = 0
+        best_dist_n1_n2 = 42
         for n1 in list_n:
             for n2 in list_n:
                 if not n1 == n2:
@@ -251,8 +254,6 @@ class Kohonen:
         plt.figure()
         plt.suptitle('spikes classified' + extra_text)
         for i in range(spike_count):
-            color_gpe = (0, 0, 0)
-
             #select a spike randomly
             r = rnd.randrange(len(s))
             value = s.pop(r)

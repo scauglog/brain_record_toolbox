@@ -1,19 +1,18 @@
-import scipy.io #open matlab file
+import scipy.io  #open matlab file
 import matplotlib.pyplot as plt
-#import operator #sorting
-import math #abs value
-import numpy as np #array and arange
+import math  #abs value
+import numpy as np  #array and arange
 from scipy.signal import butter, filtfilt
-from scipy import stats #for zscore calc
-import copy #used for list copy same pb as ruby
+from scipy import stats  #for zscore calc
+import copy  #used for list copy same pb as ruby
 import kohonen_neuron as nn
-import random as rnd #used for plotting spike
+import random as rnd  #used for plotting spike
 import csv
 
 
 class Signal_processing:
     def __init__(self, save=False, show=False, img_ext='.png'):
-        self.save = save
+        self.save_img = save
         self.show = show
         self.img_ext = img_ext
 
@@ -26,8 +25,8 @@ class Signal_processing:
     #filter multichannel filter subtract col mean -> butterworth -> zscore
     def signal_mc_filtering(self, signal, lowcut, highcut, fs):
         print('\n### signal filtering ###')
-        mean = signal.mean(0) #mean of each column
-        mean = np.tile(mean, (signal.shape[0], 1)) #duplicate matrix for each row
+        mean = signal.mean(0)  #mean of each column
+        mean = np.tile(mean, (signal.shape[0], 1))  #duplicate matrix for each row
         signal -= mean
 
         #apply butterworth filter and zscore
@@ -41,7 +40,7 @@ class Signal_processing:
         plt.figure('signal after filtering')
         plt.suptitle('')
         plt.plot(range(signal.shape[0]), signal)
-        if self.save:
+        if self.save_img:
             plt.savefig('signal_after_filtering' + self.img_ext, bbox_inches='tight')
         if not self.show:
             plt.close()
@@ -59,12 +58,13 @@ class Signal_processing:
             list.append(i)
             if len(list) > (a_spike + b_spike):
                 del list[0]
-                if list[b_spike] < tresh and (cpt - last_spike) > a_spike:#and list[b_spike]<list[b_spike+1]:
+                if list[b_spike] < tresh and (cpt - last_spike) > a_spike:  #and list[b_spike]<list[b_spike+1]:
                     spikes_values.append(copy.copy(list))
                     spikes_time.append(cpt - a_spike)
                     last_spike = cpt
             cpt += 1
-        spikes_values = np.array(spikes_values) #can't use directly np.array because it raise an error for first spike (empty array)
+        spikes_values = np.array(
+            spikes_values)  #can't use directly np.array because it raise an error for first spike (empty array)
         return spikes_values, spikes_time
 
     def smooth_spikes(self, spikes_values, window_size):
@@ -114,7 +114,7 @@ class Signal_processing:
             value = s.pop(r)
             plt.plot(range(len(value)), value)
 
-        if self.save:
+        if self.save_img:
             plt.savefig('spikes_find' + extra_text + self.img_ext, bbox_inches='tight')
         if not self.show:
             plt.close()
@@ -132,7 +132,7 @@ class Signal_processing:
             graph_y.append(0)
         plt.plot(graph_x, graph_y)
 
-        if self.save:
+        if self.save_img:
             plt.savefig('signal_spikes' + extra_text + self.img_ext, bbox_inches='tight')
         if not self.show:
             plt.close()
@@ -153,10 +153,11 @@ class Signal_processing:
 
     #find patterns of spikes using kohonen network
     def find_spike_template_kohonen(self, spikes_values, col, row, weight_count, max_weight, alpha, neighbor, min_win,
-                                    dist_treshold, ext_img, save, show):
+                                    dist_treshold):
         print('\n## kohonen ##')
 
-        self.map = nn.Kohonen(col, row, weight_count, max_weight, alpha, neighbor, min_win, ext_img, save, show)
+        self.map = nn.Kohonen(col, row, weight_count, max_weight, alpha, neighbor, min_win, self.ext_img, self.save_img,
+                              self.show)
         iteration_count = 0
         i = 0
         #while iteration_count<2000:
@@ -191,31 +192,32 @@ class Signal_processing:
         csvfile = open(filename, 'rb')
         return csv.reader(csvfile, delimiter=',', quotechar='"')
 
-    def vicon_extract(self,data,dict={}):
-        events=['Foot Strike', 'Foot Off', 'Event']
-        context=['Right', 'Left', 'General']
-        events_extraction = False #flag for events extraction
-        sync_extraction = False #flag for sync extraction
+    def vicon_extract(self, data, dict={}):
+        events = ['Foot Strike', 'Foot Off', 'Event']
+        context = ['Right', 'Left', 'General']
+        events_extraction = False  #flag for events extraction
+        sync_extraction = False  #flag for sync extraction
         cpt = 0
         #if no dictionnary is passed create a new dict
         if context[0] not in dict:
             for c in context:
-                dict[c]={}
+                dict[c] = {}
                 for e in events:
-                    dict[c][e]=[]
-            dict['fq'] = 0 #store frequency sampling
-            dict['sync'] = 0 #store beginning of the TDT
+                    dict[c][e] = []
+            dict['fq'] = 0  #store frequency sampling
+            dict['sync'] = 0  #store beginning of the TDT
         for row in data:
-            if len(row) == 0: #when there is a row with no data means we are at the end of data set for this kind of data
+            if len(
+                    row) == 0:  #when there is a row with no data means we are at the end of data set for this kind of data
                 events_extraction = False
                 sync_extraction = False
             elif len(row) == 1 and row[0] == 'EVENTS':
                 events_extraction = True
-                cpt = -1 #ignore header
+                cpt = -1  #ignore header
             elif len(row) == 1 and row[0] == 'ANALOG':
                 sync_extraction = True
-                cpt = -3 #ignore the 4th first line containing sampling frequency and header
-            elif events_extraction and cpt > 0:#add time events to the correct list
+                cpt = -3  #ignore the 4th first line containing sampling frequency and header
+            elif events_extraction and cpt > 0:  #add time events to the correct list
                 dict[row[1]][row[2]].append(float(row[3]))
             elif sync_extraction and cpt == -2:
                 dict['fq'] = float(row[0])
@@ -225,18 +227,90 @@ class Signal_processing:
             cpt += 1
         return dict
 
-    def synch_vicon_with_TDT(self,dict,TDT_padding=0):
+    def synch_vicon_with_TDT(self, dict, TDT_padding=0):
         #synchronise vicon data with the beginning of the TDT
-        events=['Foot Strike', 'Foot Off', 'Event']
-        context=['Right', 'Left', 'General']
+        events = ['Foot Strike', 'Foot Off', 'Event']
+        context = ['Right', 'Left', 'General']
         for c in context:
             for e in events:
                 for time in dict[c][e]:
-                    time-= dict['sync'] / dict['fq']
-                    time+= TDT_padding
+                    time -= dict['sync'] / dict['fq']
+                    time += TDT_padding
 
                 dict[c][e] = sorted(dict[c][e])
         return dict
+
+    def binarise_vicon_step(self, steps):
+        time = [0]
+        bin = [0]
+        for val in steps:
+            time.append(val)
+            bin.append(0)
+            time.append(val)
+            bin.append(1)
+            time.append(val)
+            bin.append(0)
+
+        return time, bin
+
+    def fire_rate(self, all_chan_clusters, length_signal, fs, block_duration):
+        global_fire = []
+        all_chan_firerates = []
+        number_of_block = int((length_signal / fs) / block_duration) + 1
+        #initialise list for storing global firing count of each block
+        for time in range(number_of_block):
+            global_fire.append(0)
+
+        for chan in range(len(all_chan_clusters)):
+            print('---- channel: ' + str(chan + 1) + ' ----')
+            firerate_chan = []
+            for clu in all_chan_clusters[chan]:
+                #init list for storing firing count of each block of this cluster
+                firerate_cluster = []
+                for time in range(number_of_block):
+                    firerate_cluster.append(0)
+                for time in clu.spikes_time:
+                    block_number = int((time / fs) / block_duration)
+                    firerate_cluster[block_number] += 1
+                    global_fire[block_number] += 1
+                firerate_chan.append(firerate_cluster)
+            all_chan_firerates.append(firerate_chan)
+        return all_chan_firerates, global_fire
+
+    def plot_global_firerate(self, global_fire, strike_time, strike_bin, off_time, off_bin, length_signal, fs,
+                             block_duration, extra_txt=''):
+        plt.figure()
+        plt.subplot(2, 1, 1)
+        plt.plot(strike_time, strike_bin)
+        plt.plot(off_time, off_bin)
+        plt.xlim(0, int(length_signal / fs) + 1)
+        plt.subplot(2, 1, 2)
+        plt.xlim(0, int((length_signal / fs) / block_duration) + 1)
+        plt.plot(global_fire)
+
+        if self.save_img:
+            plt.savefig('walk_firerate_correlation_global' + extra_txt + self.img_ext, bbox_inches='tight')
+        if not self.show:
+            plt.close()
+
+    def plot_all_chan_firerates(self, all_chan_firerates, strike_time, strike_bin, off_time, off_bin, length_signal, fs,
+                                block_duration, extra_txt=''):
+        for chan in range(len(all_chan_firerates)):
+            plt.figure()
+            plt.subplot(2, 1, 1)
+            plt.plot(strike_time, strike_bin)
+            plt.plot(off_time, off_bin)
+            plt.xlim(0, int(length_signal / fs) + 1)
+            plt.subplot(2, 1, 2)
+            plt.xlim(0, int((length_signal / fs) / block_duration) + 1)
+            for list_times in all_chan_firerates[chan]:
+                plt.plot(list_times)
+
+        if self.save_img:
+            plt.savefig('walk_firerate_correlation_trial_chan' + str(chan + 1) + extra_txt + self.img_ext,
+                        bbox_inches='tight')
+        if not self.show:
+            plt.close()
 
 
 #store spikes values and time that match a specific template

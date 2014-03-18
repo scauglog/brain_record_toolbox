@@ -157,7 +157,7 @@ class Signal_processing:
                                     dist_treshold):
         print('\n## kohonen ##')
 
-        self.map = nn.Kohonen(col, row, weight_count, max_weight, alpha, neighbor, min_win, self.ext_img, self.save_img,
+        self.map = nn.Kohonen(col, row, weight_count, max_weight, alpha, neighbor, min_win, self.img_ext, self.save_img,
                               self.show)
         iteration_count = 0
         i = 0

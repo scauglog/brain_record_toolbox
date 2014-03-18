@@ -50,7 +50,7 @@ spikes_values, spikes_time = sp.find_spikes(s, a_spike, b_spike, spike_thresh)
 print('spikes found: ' + str(spikes_values.shape[0]))
 spikes_values = sp.smooth_spikes(spikes_values, 3)
 koho = sp.find_spike_template_kohonen(spikes_values, koho_col, koho_row, weight_count, max_weight, alpha, neighbor,
-                                      min_win, dist_thresh, img_ext, save_img, show)
+                                      min_win, dist_thresh)
 all_chan_spikes_values.append(spikes_values)
 all_chan_koho.append(koho)
 #koho.plot_network('_channel_'+str(chan+1))

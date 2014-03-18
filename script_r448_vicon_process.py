@@ -47,7 +47,7 @@ for trial in trials:
                                block_duration, '_trial' + str(trial + 1))
     sp.plot_global_firerate(global_fire, strike_time, strike_bin, off_time, off_bin, length_signal, fs, block_duration,
                             '_trial' + str(trial + 1))
-
+    sp.show_plot()
     #walk
     # walk = sorted(data['Right']['Foot Strike'] + data['Right']['Foot Off'])
     # start_walk = data['General']['Foot Strike']

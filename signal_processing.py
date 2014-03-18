@@ -138,7 +138,8 @@ class Signal_processing:
             plt.close()
 
     def show_plot(self):
-        plt.show()
+        if self.show:
+            plt.show()
 
     #find the pattern of spikes using mode
     def find_spike_template_mode(self, spikes_values):

@@ -59,54 +59,5 @@ for trial in trials:
     #         end_walk.append(max(l1 + l2))
     # end_walk.append(max(data['Right']['Foot Strike'], data['Right']['Foot Off']))
 
-
-    # for time in range(int((length_signal / fs) / block_duration) + 1):
-    #     global_fire.append(0)
-    # for chan in range(len(data_spike['clusters'])):
-    # print('---- channel: ' + str(chan + 1) + ' ----')
-    # fq = []
-    # for clu in data_spike['clusters'][chan]:
-    #     l = []
-    #     for time in range(int((length_signal / fs) / block_duration) + 1):
-    #         l.append(0)
-    #     for time in clu.spikes_time:
-    #         l[int((time / fs) / block_duration)] += 1
-    #         global_fire[int((time / fs) / block_duration)] += 1
-    #     fq.append(l)
-    # all_chan_firerates.append(fq)
-    #
-    # plt.figure()
-    # plt.subplot(2, 1, 1)
-    # plt.plot(strike_time, strike_bin)
-    # plt.plot(off_time, off_bin)
-    # plt.xlim(0, int(length_signal / fs) + 1)
-    # plt.subplot(2, 1, 2)
-    # plt.xlim(0, int((length_signal / fs) / block_duration) + 1)
-    # for list_times in fq:
-    #     plt.plot(list_times)
-    #
-    # if save_img:
-    #     plt.savefig('walk_firerate_correlation_trial'+str(trial+1)+'_chan' + str(chan + 1) + img_ext, bbox_inches='tight')
-    # if show:
-    #     plt.show()
-    # else:
-    #     plt.close()
-    #
-    # plt.figure()
-    # plt.subplot(2, 1, 1)
-    # plt.plot(strike_time, strike_bin)
-    # plt.plot(off_time, off_bin)
-    # plt.xlim(0, int(length_signal / fs) + 1)
-    # plt.subplot(2, 1, 2)
-    # plt.xlim(0, int((length_signal / fs) / block_duration) + 1)
-    # plt.plot(global_fire)
-    #
-    # if save_img:
-    #     plt.savefig('walk_firerate_correlation_trial'+str(trial+1)+'_global'+ img_ext, bbox_inches='tight')
-    # if show:
-    #     plt.show()
-    # else:
-    #     plt.close()
-
 print('\n\n#################')
 print('####   END   ####')

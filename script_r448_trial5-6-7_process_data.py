@@ -106,7 +106,7 @@ for trial in trials:
         all_chan_clusters.append([])
         for gpe in all_chan_templates[chan]:
             all_chan_clusters[chan].append(sig_proc.Spikes_cluster(gpe.template, gpe.number + 1))
-        spikes_classes = sp.classify_spikes(spikes_values, spikes_time, all_chan_clusters[chan], 2 * dist_thresh)
+        #spikes_classes = sp.classify_spikes(spikes_values, spikes_time, all_chan_clusters[chan], 2 * dist_thresh)
 
         #all_chan_spikes_classes.append(spikes_classes)
         all_chan_spikes_times.append(spikes_time)
@@ -116,7 +116,7 @@ for trial in trials:
         sp.show_plot()
 
     record_data[trial] = {'spikes_values': all_chan_spikes_values, 'spikes_time': all_chan_spikes_times,
-                          'clusters': all_chan_clusters}
+                          'clusters': all_chan_clusters, 'length_signal': signal.shape[1], 'fs': fs}
 
 if save_obj:
     with open(dir_name + 'data_processed', 'wb') as my_file:

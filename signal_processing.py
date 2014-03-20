@@ -311,12 +311,105 @@ class Signal_processing:
             for list_times in all_chan_firerates[chan]:
                 plt.plot(list_times)
 
+            if self.save_img:
+                plt.savefig('walk_firerate_correlation_chan' + str(chan + 1) + extra_txt + self.img_ext,
+                            bbox_inches='tight')
+            if not self.show:
+                plt.close()
+
+    #find end and start of a step
+    def find_step_time(self, times_start, times_end):
+        steps_time = []
+        for i in range(len(times_start) - 1):
+                end = filter(lambda x: times_start[i] < x < times_start[i + 1], times_end)
+                if not len(end) == 0:
+                    end = end[0]
+                    start = times_start[i]
+                    steps_time.append([start, end])
+        return steps_time
+
+    def stat_mean_std_step(self, data_dict):
+        stat_dict={}
+        for chan in range(len(data_dict)):
+            stat_dict[chan] = {}
+            for cluster in data_dict[chan]:
+                stat_dict[chan][cluster] = {'all_vs_push': 0, 'all_vs_off': 0, 'push_vs_off': 0}
+                if not len(data_dict[chan][cluster]['all_delta']) == 0 and not len(data_dict[chan][cluster]['push_delta_all_step']) == 0:
+                    t, p = stats.ttest_ind(data_dict[chan][cluster]['all_delta'], data_dict[chan][cluster]['push_delta_all_step'], equal_var=False)
+                    stat_dict[chan][cluster]['all_vs_push'] = p
+
+                if not len(data_dict[chan][cluster]['all_delta']) == 0 and not len(data_dict[chan][cluster]['off_delta_all_step']) == 0:
+                    t, p = stats.ttest_ind(data_dict[chan][cluster]['all_delta'], data_dict[chan][cluster]['off_delta_all_step'], equal_var=False)
+                    stat_dict[chan][cluster]['all_vs_off'] = p
+
+                if not len(data_dict[chan][cluster]['off_delta_all_step']) == 0 and not len(data_dict[chan][cluster]['push_delta_all_step']) == 0:
+                    t, p = stats.ttest_ind(data_dict[chan][cluster]['off_delta_all_step'], data_dict[chan][cluster]['push_delta_all_step'], equal_var=False)
+                    stat_dict[chan][cluster]['push_vs_off'] = p
+
+        return stat_dict
+
+    #count the number of spike well classed or wrong classed
+    def step_spike_error_stat(self, steps_list, spikes_time):
+        correct = 0
+        false = 0
+        missing = 0
+        for step in steps_list:
+            done = False
+            for time in spikes_time:
+                if step[0] < time < step[1]:
+                    correct += 1
+                    done = True
+                    break
+            if not done:
+                missing += 1
+        for time in spikes_time:
+            done = False
+            for step in steps_list:
+                if step[0] < time < step[1]:
+                    done = True
+                    break
+            if not done:
+                false += 1
+        return correct, false, missing
+
+    def find_delta_time_step(self, steps_time, spikes_time, delta_time, fs, max_step_time):
+            delta_all_step = []
+            delta_each_step = []
+            for step in steps_time:
+                    # exclude too long move
+                    if step[1] - step[0] < max_step_time:
+                        delta_list = []
+                        for j in range(len(spikes_time) - 1):
+                            if step[0] < spikes_time[j] / fs < step[1] and step[0] < spikes_time[j + 1] / fs < step[1]:
+                                delta_all_step.append(delta_time[j])
+                                delta_list.append(delta_time[j])
+                        delta_each_step.append(delta_list)
+            return delta_each_step, delta_all_step
+
+    def plot_step_spike_classify(self, strike_times, strike_bin, off_times, off_bin, spike_is_step, spikes_time, length_signal, fs, extra_txt=''):
+        plot_x=[0]
+        plot_y=[0]
+        for i in range(len(spike_is_step)):
+            plot_x.append(spikes_time[i] / fs)
+            plot_y.append(0)
+            plot_x.append(spikes_time[i] / fs)
+            plot_y.append(spike_is_step[i])
+            plot_x.append(spikes_time[i] / fs)
+            plot_y.append(0)
+
+        plt.figure()
+        plt.subplot(2, 1, 1)
+        plt.plot(strike_times, strike_bin)
+        plt.plot(off_times, off_bin)
+        plt.xlim(0, int(length_signal / fs) + 1)
+        plt.subplot(2, 1, 2)
+        plt.xlim(0, int(length_signal / fs) + 1)
+        plt.plot(plot_x, plot_y)
+
         if self.save_img:
-            plt.savefig('walk_firerate_correlation_trial_chan' + str(chan + 1) + extra_txt + self.img_ext,
-                        bbox_inches='tight')
+            plt.savefig('spike_step_classed' + extra_txt + self.img_ext, bbox_inches='tight')
         if not self.show:
             plt.close()
-
 
 #store spikes values and time that match a specific template
 class Spikes_cluster:

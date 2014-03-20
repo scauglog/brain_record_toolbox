@@ -105,20 +105,14 @@ good_chan_cluster = {}
 for chan in range(len(data_dict)):
     for cluster in data_dict[chan]:
         #print('--- chan: ' + str(chan+1) + ' cluster: ' + str(cluster)+' ---')
-
+        all_delta = data_dict[chan][cluster]['all_delta']
+        push_delta = data_dict[chan][cluster]['push_delta_all_step']
+        off_delta =  data_dict[chan][cluster]['off_delta_all_step']
+        all_vs_push, all_vs_off, push_vs_off = sp.cluster_step_ttest(all_delta, push_delta, off_delta)
         #calulate p value
-        data_dict[chan][cluster].update({'all_vs_push': 0, 'all_vs_off': 0, 'push_vs_off': 0})
-        if not len(data_dict[chan][cluster]['all_delta']) == 0 and not len(data_dict[chan][cluster]['push_delta_all_step']) == 0:
-            t, p = stats.ttest_ind(data_dict[chan][cluster]['all_delta'], data_dict[chan][cluster]['push_delta_all_step'], equal_var=False)
-            data_dict[chan][cluster]['all_vs_push'] = p
-
-        if not len(data_dict[chan][cluster]['all_delta']) == 0 and not len(data_dict[chan][cluster]['off_delta_all_step']) == 0:
-            t, p = stats.ttest_ind(data_dict[chan][cluster]['all_delta'], data_dict[chan][cluster]['off_delta_all_step'], equal_var=False)
-            data_dict[chan][cluster]['all_vs_off'] = p
-
-        if not len(data_dict[chan][cluster]['off_delta_all_step']) == 0 and not len(data_dict[chan][cluster]['push_delta_all_step']) == 0:
-            t, p = stats.ttest_ind(data_dict[chan][cluster]['off_delta_all_step'], data_dict[chan][cluster]['push_delta_all_step'], equal_var=False)
-            data_dict[chan][cluster]['push_vs_off'] = p
+        data_dict[chan][cluster]['all_vs_push'] = all_vs_push
+        data_dict[chan][cluster]['all_vs_off'] = all_vs_off
+        data_dict[chan][cluster]['push_vs_off'] = push_vs_off
 
         #selecting interesting channel
         #if data_dict[chan][cluster]['all_vs_push'] < 0.05 and data_dict[chan][cluster]['all_vs_off'] < 0.05 and data_dict[chan][cluster]['push_vs_off'] < 0.05:
@@ -133,7 +127,7 @@ for chan in range(len(data_dict)):
 print good_chan_cluster
 
 
-trial = trials[0]
+
 for trial in trials:
     print('#### Trial ' + str(trial + 1) + ' ####')
     push_steps_time = vicon_data[trial]['push_steps_time']
@@ -143,42 +137,19 @@ for trial in trials:
         vicon_data[trial][chan] = {}
         for cluster in good_chan_cluster[chan]:
             #print('\n\n--- channel ' + str(chan) + ' cluster '+ str(cluster) + '---')
-            tmp_list = []
-            push_spikes_time = []
-            off_spikes_time = []
-            other_spikes_time = []
-            spike_is_step = []
-            for x in range(window_size):
-                spike_is_step.append(0)
-            for i in range(len(record_data[trial]['clusters'][chan][cluster-1].spikes_time)-1):
-                tmp_list.append(record_data[trial]['clusters'][chan][cluster-1].delta_time[i])
-                if len(tmp_list) > window_size:
-                    del tmp_list[0]
+            spikes_time = record_data[trial]['clusters'][chan][cluster - 1].spikes_time
+            delta_time = record_data[trial]['clusters'][chan][cluster - 1].delta_time
+            all_mean = good_chan_cluster[chan][cluster]['all']
+            push_mean = good_chan_cluster[chan][cluster]['push']
+            off_mean = good_chan_cluster[chan][cluster]['off']
+            off_spikes_time, push_spikes_time, other_spikes_time, spike_is_step = sp.class_spike_in_step(spikes_time,delta_time, all_mean, push_mean, off_mean, window_size, fs)
 
-                if len(tmp_list) == window_size:
-                    err_all = (np.mean(tmp_list) - good_chan_cluster[chan][cluster]['all'])**2
-                    err_push = (np.mean(tmp_list) - good_chan_cluster[chan][cluster]['push'])**2
-                    err_off = (np.mean(tmp_list) - good_chan_cluster[chan][cluster]['off'])**2
-                    min_err = min(err_all, err_push, err_off)
-                    if min_err == err_all:
-                        spike_is_step.append(0)
-                        other_spikes_time.append(record_data[trial]['clusters'][chan][cluster - 1].spikes_time[i] / fs)
-                    elif min_err == err_push:
-                        spike_is_step.append(1)
-                        push_spikes_time.append(record_data[trial]['clusters'][chan][cluster - 1].spikes_time[i] / fs)
-                    elif min_err == err_off:
-                        spike_is_step.append(-1)
-                        off_spikes_time.append(record_data[trial]['clusters'][chan][cluster - 1].spikes_time[i] / fs)
-                    else:
-                        print 'error'
-                        spike_is_step.append(0)
-
-            #push
+            #push stat
             correct_push, false_push, missing_push = sp.step_spike_error_stat(push_steps_time, push_spikes_time)
-            #off
+            #off stat
             correct_off, false_off, missing_off = sp.step_spike_error_stat(off_steps_time, off_spikes_time)
 
-
+            #store result
             vicon_data[trial][chan][cluster] = {}
             vicon_data[trial][chan][cluster]['push_spikes_time'] = push_spikes_time
             vicon_data[trial][chan][cluster]['off_spikes_time'] = off_spikes_time
@@ -190,6 +161,7 @@ for trial in trials:
             vicon_data[trial][chan][cluster]['correct_off'] = correct_off
             vicon_data[trial][chan][cluster]['false_off'] = false_off
             vicon_data[trial][chan][cluster]['missing_off'] = missing_off
+            vicon_data[trial][chan][cluster]['spikes_time'] = spikes_time
 
             # print('correct push: ' + str(correct_push))
             # print('false push:   ' + str(false_push))
@@ -198,14 +170,14 @@ for trial in trials:
             # print('false off:    ' + str(false_off))
             # print('missing off:  ' + str(missing_off))
 
-            strike_times = vicon_data[trial]['strike_times']
-            strike_bin = vicon_data[trial]['strike_bin']
-            off_times = vicon_data[trial]['off_times']
-            off_bin = vicon_data[trial]['off_bin']
-            fs = record_data[trial]['fs']
-            length_signal = record_data[trial]['length_signal']
-            spikes_time = record_data[trial]['clusters'][chan][cluster-1].spikes_time
-            vicon_data[trial][chan][cluster]['spikes_time'] = spikes_time
+            # strike_times = vicon_data[trial]['strike_times']
+            # strike_bin = vicon_data[trial]['strike_bin']
+            # off_times = vicon_data[trial]['off_times']
+            # off_bin = vicon_data[trial]['off_bin']
+            # fs = record_data[trial]['fs']
+            # length_signal = record_data[trial]['length_signal']
+            # spikes_time = record_data[trial]['clusters'][chan][cluster-1].spikes_time
+
             #sp.plot_step_spike_classify(strike_times, strike_bin, off_times, off_bin, spike_is_step, spikes_time, length_signal, fs, '_chan'+str(chan)+'_cluster'+str(cluster)+'_trial'+str(trial))
 
 

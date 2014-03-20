@@ -327,6 +327,14 @@ class Signal_processing:
                     start = times_start[i]
                     steps_time.append([start, end])
         return steps_time
+    def find_full_step_time(self, push_steps_time, off_steps_time):
+        full_step=[]
+        for step_push in push_steps_time:
+            for step_off in off_steps_time:
+                if step_push[1] == step_off[0]:
+                    full_step.append([step_push[0], step_push[1], step_off[1]])
+                    break
+        return full_step
 
     def stat_mean_std_step(self, data_dict):
         stat_dict={}
@@ -385,6 +393,55 @@ class Signal_processing:
                                 delta_list.append(delta_time[j])
                         delta_each_step.append(delta_list)
             return delta_each_step, delta_all_step
+
+    def cluster_step_ttest(self, all_delta, push_delta, off_delta):
+        all_vs_push = 0
+        all_vs_off = 0
+        push_vs_off = 0
+        if not len(all_delta) == 0 and not len(push_delta) == 0:
+            t, p = stats.ttest_ind(all_delta, push_delta, equal_var=False)
+            all_vs_push = p
+
+        if not len(all_delta) == 0 and not len(off_delta) == 0:
+            t, p = stats.ttest_ind(all_delta, off_delta, equal_var=False)
+            all_vs_off = p
+
+        if not len(off_delta) == 0 and not len(push_delta) == 0:
+            t, p = stats.ttest_ind(off_delta, push_delta, equal_var=False)
+            push_vs_off = p
+        return all_vs_push, all_vs_off, push_vs_off
+
+    def class_spike_in_step(self, spikes_time, delta_time, all_mean, push_mean, off_mean, window_size, fs):
+        tmp_list = []
+        push_spikes_time = []
+        off_spikes_time = []
+        other_spikes_time = []
+        spike_is_step = []
+        for x in range(window_size):
+            spike_is_step.append(0)
+        for i in range(len(spikes_time)-1):
+            tmp_list.append(delta_time[i])
+            if len(tmp_list) > window_size:
+                del tmp_list[0]
+
+            if len(tmp_list) == window_size:
+                err_all = (np.mean(tmp_list) - all_mean)**2
+                err_push = (np.mean(tmp_list) - push_mean)**2
+                err_off = (np.mean(tmp_list) - off_mean)**2
+                min_err = min(err_all, err_push, err_off)
+                if min_err == err_all:
+                    spike_is_step.append(0)
+                    other_spikes_time.append(spikes_time[i] / fs)
+                elif min_err == err_push:
+                    spike_is_step.append(1)
+                    push_spikes_time.append(spikes_time[i] / fs)
+                elif min_err == err_off:
+                    spike_is_step.append(-1)
+                    off_spikes_time.append(spikes_time[i] / fs)
+                else:
+                    print 'error in class_spike_step spike' + spikes_time[i] + ' is not classed'
+        return off_spikes_time, push_spikes_time, other_spikes_time, spike_is_step
+
 
     def plot_step_spike_classify(self, strike_times, strike_bin, off_times, off_bin, spike_is_step, spikes_time, length_signal, fs, extra_txt=''):
         plot_x=[0]

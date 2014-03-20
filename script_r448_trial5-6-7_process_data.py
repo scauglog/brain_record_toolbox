@@ -30,7 +30,7 @@ neighbor = 4
 #number of time a neuron should win to be a good neuron
 min_win = 2
 #distance from which it's acceptable to create a new class
-dist_thresh = 4
+dist_thresh = 4.5
 
 #cluster parameter
 #minimum cluster size (absolute value)
@@ -93,6 +93,7 @@ for trial in trials:
     all_chan_spikes_values = []
     all_chan_spikes_times = []
     all_chan_clusters = []
+    all_chan_spikes_classes = []
     for chan in range(fsignal.shape[0]):
         #chan = 13
         print('\n\n--- processing chan : ' + str(chan + 1) + ' ---')
@@ -106,16 +107,17 @@ for trial in trials:
         all_chan_clusters.append([])
         for gpe in all_chan_templates[chan]:
             all_chan_clusters[chan].append(sig_proc.Spikes_cluster(gpe.template, gpe.number + 1))
-        #spikes_classes = sp.classify_spikes(spikes_values, spikes_time, all_chan_clusters[chan], 2 * dist_thresh)
+        #call to classify_spikes is mandatory if you want to have the spike in each cluster
+        spikes_classes = sp.classify_spikes(spikes_values, spikes_time, all_chan_clusters[chan], 2 * dist_thresh)
 
-        #all_chan_spikes_classes.append(spikes_classes)
+        all_chan_spikes_classes.append(spikes_classes)
         all_chan_spikes_times.append(spikes_time)
         all_chan_spikes_values.append(spikes_values)
 
     if show:
         sp.show_plot()
 
-    record_data[trial] = {'spikes_values': all_chan_spikes_values, 'spikes_time': all_chan_spikes_times,
+    record_data[trial] = {'spikes_values': all_chan_spikes_values, 'spikes_time': all_chan_spikes_times, 'spikes_classes': all_chan_spikes_classes,
                           'clusters': all_chan_clusters, 'length_signal': signal.shape[1], 'fs': fs}
 
 if save_obj:

@@ -327,14 +327,15 @@ class Signal_processing:
                 if not len(end) == 0:
                     end = end[0]
                     start = times_start[i]
-                    steps_time.append([start, end])
+                    if end-start < 1:
+                        steps_time.append([start, end])
         return steps_time
 
     def find_full_step_time(self, stance_steps_time, swing_steps_time):
         full_step=[]
         for step_stance in stance_steps_time:
             for step_swing in swing_steps_time:
-                if step_stance[1] == step_swing[0]:
+                if step_stance[1] == step_swing[0] and step_swing[0]-step_stance[0] < 1:
                     full_step.append([step_stance[0], step_stance[1], step_swing[1]])
                     break
         return full_step
@@ -475,31 +476,31 @@ class Signal_processing:
         stance_spike_fq=[]
         swing_spike_fq=[]
         for step in full_step:
-                stance_block_duration = (step[1]-step[0])/nb_block
-                swing_block_duration = (step[2]-step[1])/nb_block
-                step_stance_count = []
-                step_swing_count = []
-                for i in range(nb_block):
-                    step_stance_count.append(0)
-                    step_swing_count.append(0)
+            stance_block_duration = (step[1]-step[0])/nb_block
+            swing_block_duration = (step[2]-step[1])/nb_block
+            step_stance_count = []
+            step_swing_count = []
+            for i in range(nb_block):
+                step_stance_count.append(0)
+                step_swing_count.append(0)
 
-                for spike_time in spikes_time:
-                    if step[0] < spike_time/fs < step[1]:
-                        list_block = np.arange(step[0], step[1], stance_block_duration)
-                        list_block = np.hstack((list_block, step[1]))
-                        for i in range(nb_block):
-                            if list_block[i] < spike_time/fs < list_block[i+1]:
-                                step_stance_count[i] += 1
-                    elif step[1] < spike_time/fs < step[2]:
-                        list_block = np.arange(step[1], step[2], swing_block_duration)
-                        list_block = np.hstack((list_block, step[2]))
-                        for i in range(nb_block):
-                            if list_block[i] < spike_time/fs < list_block[i+1]:
-                                step_swing_count[i] += 1
-                    elif spike_time/fs > step[2]:
-                        break
-                stance_spike_fq.append(np.array(step_stance_count) / stance_block_duration)
-                swing_spike_fq.append(np.array(step_swing_count) / swing_block_duration)
+            for spike_time in spikes_time:
+                if step[0] < spike_time/fs < step[1]:
+                    list_block = np.arange(step[0], step[1], stance_block_duration)
+                    list_block = np.hstack((list_block, step[1]))
+                    for i in range(nb_block):
+                        if list_block[i] < spike_time/fs < list_block[i+1]:
+                            step_stance_count[i] += 1
+                elif step[1] < spike_time/fs < step[2]:
+                    list_block = np.arange(step[1], step[2], swing_block_duration)
+                    list_block = np.hstack((list_block, step[2]))
+                    for i in range(nb_block):
+                        if list_block[i] < spike_time/fs < list_block[i+1]:
+                            step_swing_count[i] += 1
+                # elif spike_time/fs > step[2]:
+                #     break
+            stance_spike_fq.append(np.array(step_stance_count) / stance_block_duration)
+            swing_spike_fq.append(np.array(step_swing_count) / swing_block_duration)
 
         return stance_spike_fq, swing_spike_fq
 

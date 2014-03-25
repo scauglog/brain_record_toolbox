@@ -39,7 +39,7 @@ min_clus_abs = 20
 min_clus_rel = 0.01
 
 #trial to analyse
-trials = range(5 - 1, 7)
+trials = [2,5,6,7]
 
 #where to store data
 record_data = {}
@@ -52,9 +52,9 @@ signals = sp.load_m(dir_name + 'cell_trial.mat', 't')
 fs = float(sp.load_m(dir_name + 'fech.mat', 'sampFreq'))
 
 
-trial = trials[0]
-print('---- trial: ' + str(trial + 1) + ' ----')
-signal = np.transpose(signals[0][trial])
+trial = trials[1]
+print('---- trial: ' + str(trial) + ' ----')
+signal = np.transpose(signals[0][trial-1])
 fsignal = sp.signal_mc_filtering(signal, low_cut, high_cut, fs)
 
 #all_chan_koho = []
@@ -86,8 +86,8 @@ if show:
 
 #class spikes for each trial
 for trial in trials:
-    print('---- trial: ' + str(trial + 1) + ' ----')
-    signal = np.transpose(signals[0][trial])
+    print('---- trial: ' + str(trial) + ' ----')
+    signal = np.transpose(signals[0][trial-1])
     fsignal = sp.signal_mc_filtering(signal, low_cut, high_cut, fs)
 
     all_chan_spikes_values = []

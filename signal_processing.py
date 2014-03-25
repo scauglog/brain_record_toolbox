@@ -22,7 +22,7 @@ class Signal_processing:
     def load_m(self, filename, var_name):
         return scipy.io.loadmat(filename)[var_name]
 
-    #filter multichannel filter subtract col mean -> butterworth -> zscore
+    #filter multichannel filter : subtract col mean -> butterworth -> zscore
     def signal_mc_filtering(self, signal, lowcut, highcut, fs):
         print('\n### signal filtering ###')
         #mean of each column
@@ -238,11 +238,13 @@ class Signal_processing:
         context = ['Right', 'Left', 'General']
         for c in context:
             for e in events:
+                list_time=[]
                 for time in vicon_dict[c][e]:
                     time -= vicon_dict['synch'] / vicon_dict['fs']
                     time += TDT_padding
+                    list_time.append(time)
 
-                vicon_dict[c][e] = sorted(vicon_dict[c][e])
+                vicon_dict[c][e] = sorted(list_time)
         return vicon_dict
 
     def binarise_vicon_step(self, steps):
@@ -327,12 +329,13 @@ class Signal_processing:
                     start = times_start[i]
                     steps_time.append([start, end])
         return steps_time
-    def find_full_step_time(self, push_steps_time, off_steps_time):
+
+    def find_full_step_time(self, stance_steps_time, swing_steps_time):
         full_step=[]
-        for step_push in push_steps_time:
-            for step_off in off_steps_time:
-                if step_push[1] == step_off[0]:
-                    full_step.append([step_push[0], step_push[1], step_off[1]])
+        for step_stance in stance_steps_time:
+            for step_swing in swing_steps_time:
+                if step_stance[1] == step_swing[0]:
+                    full_step.append([step_stance[0], step_stance[1], step_swing[1]])
                     break
         return full_step
 
@@ -394,27 +397,27 @@ class Signal_processing:
                         delta_each_step.append(delta_list)
             return delta_each_step, delta_all_step
 
-    def cluster_step_ttest(self, all_delta, push_delta, off_delta):
-        all_vs_push = 0
-        all_vs_off = 0
-        push_vs_off = 0
-        if not len(all_delta) == 0 and not len(push_delta) == 0:
-            t, p = stats.ttest_ind(all_delta, push_delta, equal_var=False)
-            all_vs_push = p
+    def cluster_step_ttest(self, all_delta, stance_delta, swing_delta):
+        all_vs_stance = 0
+        all_vs_swing = 0
+        stance_vs_swing = 0
+        if not len(all_delta) == 0 and not len(stance_delta) == 0:
+            t, p = stats.ttest_ind(all_delta, stance_delta, equal_var=False)
+            all_vs_stance = p
 
-        if not len(all_delta) == 0 and not len(off_delta) == 0:
-            t, p = stats.ttest_ind(all_delta, off_delta, equal_var=False)
-            all_vs_off = p
+        if not len(all_delta) == 0 and not len(swing_delta) == 0:
+            t, p = stats.ttest_ind(all_delta, swing_delta, equal_var=False)
+            all_vs_swing = p
 
-        if not len(off_delta) == 0 and not len(push_delta) == 0:
-            t, p = stats.ttest_ind(off_delta, push_delta, equal_var=False)
-            push_vs_off = p
-        return all_vs_push, all_vs_off, push_vs_off
+        if not len(swing_delta) == 0 and not len(stance_delta) == 0:
+            t, p = stats.ttest_ind(swing_delta, stance_delta, equal_var=False)
+            stance_vs_swing = p
+        return all_vs_stance, all_vs_swing, stance_vs_swing
 
-    def class_spike_in_step(self, spikes_time, delta_time, all_mean, push_mean, off_mean, window_size, fs):
+    def class_spike_in_step(self, spikes_time, delta_time, all_mean, stance_mean, swing_mean, window_size, fs):
         tmp_list = []
-        push_spikes_time = []
-        off_spikes_time = []
+        stance_spikes_time = []
+        swing_spikes_time = []
         other_spikes_time = []
         spike_is_step = []
         for x in range(window_size):
@@ -426,21 +429,21 @@ class Signal_processing:
 
             if len(tmp_list) == window_size:
                 err_all = (np.mean(tmp_list) - all_mean)**2
-                err_push = (np.mean(tmp_list) - push_mean)**2
-                err_off = (np.mean(tmp_list) - off_mean)**2
-                min_err = min(err_all, err_push, err_off)
+                err_stance = (np.mean(tmp_list) - stance_mean)**2
+                err_swing = (np.mean(tmp_list) - swing_mean)**2
+                min_err = min(err_all, err_stance, err_swing)
                 if min_err == err_all:
                     spike_is_step.append(0)
                     other_spikes_time.append(spikes_time[i] / fs)
-                elif min_err == err_push:
+                elif min_err == err_stance:
                     spike_is_step.append(1)
-                    push_spikes_time.append(spikes_time[i] / fs)
-                elif min_err == err_off:
+                    stance_spikes_time.append(spikes_time[i] / fs)
+                elif min_err == err_swing:
                     spike_is_step.append(-1)
-                    off_spikes_time.append(spikes_time[i] / fs)
+                    swing_spikes_time.append(spikes_time[i] / fs)
                 else:
                     print 'error in class_spike_step spike' + spikes_time[i] + ' is not classed'
-        return off_spikes_time, push_spikes_time, other_spikes_time, spike_is_step
+        return swing_spikes_time, stance_spikes_time, other_spikes_time, spike_is_step
 
 
     def plot_step_spike_classify(self, strike_times, strike_bin, off_times, off_bin, spike_is_step, spikes_time, length_signal, fs, extra_txt=''):
@@ -467,6 +470,57 @@ class Signal_processing:
             plt.savefig('spike_step_classed' + extra_txt + self.img_ext, bbox_inches='tight')
         if not self.show:
             plt.close()
+
+    def phase_step_spike_fq(self, spikes_time, full_step, nb_block, fs):
+        stance_spike_fq=[]
+        swing_spike_fq=[]
+        for step in full_step:
+                stance_block_duration = (step[1]-step[0])/nb_block
+                swing_block_duration = (step[2]-step[1])/nb_block
+                step_stance_count = []
+                step_swing_count = []
+                for i in range(nb_block):
+                    step_stance_count.append(0)
+                    step_swing_count.append(0)
+
+                for spike_time in spikes_time:
+                    if step[0] < spike_time/fs < step[1]:
+                        list_block = np.arange(step[0], step[1], stance_block_duration)
+                        list_block = np.hstack((list_block, step[1]))
+                        for i in range(nb_block):
+                            if list_block[i] < spike_time/fs < list_block[i+1]:
+                                step_stance_count[i] += 1
+                    elif step[1] < spike_time/fs < step[2]:
+                        list_block = np.arange(step[1], step[2], swing_block_duration)
+                        list_block = np.hstack((list_block, step[2]))
+                        for i in range(nb_block):
+                            if list_block[i] < spike_time/fs < list_block[i+1]:
+                                step_swing_count[i] += 1
+                    elif spike_time/fs > step[2]:
+                        break
+                stance_spike_fq.append(np.array(step_stance_count) / stance_block_duration)
+                swing_spike_fq.append(np.array(step_swing_count) / swing_block_duration)
+
+        return stance_spike_fq, swing_spike_fq
+
+    def step_initiation_fq(self, spikes_time, step, nb_block, block_duration, fs):
+        list_block = []
+
+        for n in range(nb_block+1):
+            list_block.append(step-n*block_duration)
+        list_block = sorted(list_block)
+        step_spike_count=[]
+        for i in range(nb_block):
+            step_spike_count.append(0)
+        for time in spikes_time:
+            if list_block[0] < time/fs < list_block[nb_block]:
+                for i in range(nb_block):
+                    if list_block[i] < time/fs < list_block[i+1]:
+                        step_spike_count[i] += 1
+            elif time/fs > list_block[nb_block]:
+                break
+
+        return np.array(step_spike_count)/block_duration
 
 #store spikes values and time that match a specific template
 class Spikes_cluster:

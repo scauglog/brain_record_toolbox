@@ -7,8 +7,8 @@ import copy
 
 dir_name = '../data/r448/r448_131022_rH/'
 
-img_ext = '.png'
-save_img = False
+img_ext = '.eps'
+save_img = True
 show = False
 # tdt padding in second
 TDT_padding = 2
@@ -18,7 +18,7 @@ sp = sig_proc.Signal_processing(save_img, show, img_ext)
 max_step_time = 1
 # number of delta between spike to take for mean comparison to determine wich step it is
 window_size = 3
-trials = range(5 - 1, 7)
+trials = [2, 5, 6, 7]
 # for trial in trials:
 
 
@@ -81,8 +81,8 @@ for trial in trials:
     all_chan_firerates, global_fire = sp.fire_rate(all_chan_cluster, length_signal, fs, block_duration)
 
     #some plot
-    #sp.plot_all_chan_firerates(all_chan_firerates, strike_times, strike_bin, off_times, off_bin, length_signal, fs, block_duration, '_trial' + str(trial + 1))
-    #sp.plot_global_firerate(global_fire, strike_times, strike_bin, off_times, off_bin, length_signal, fs, block_duration, '_trial' + str(trial + 1))
+    sp.plot_all_chan_firerates(all_chan_firerates, strike_times, strike_bin, off_times, off_bin, length_signal, fs, block_duration, '_trial' + str(trial + 1))
+    sp.plot_global_firerate(global_fire, strike_times, strike_bin, off_times, off_bin, length_signal, fs, block_duration, '_trial' + str(trial + 1))
 
     print('### find push and off delta time ###')
     #for each step in every trial put the delta time between two spike that append during the step in the data_dict
@@ -163,22 +163,22 @@ for trial in trials:
             vicon_data[trial][chan][cluster]['missing_off'] = missing_off
             vicon_data[trial][chan][cluster]['spikes_time'] = spikes_time
 
-            # print('correct push: ' + str(correct_push))
-            # print('false push:   ' + str(false_push))
-            # print('missing push: ' + str(missing_push))
-            # print('\ncorrect off:  ' + str(correct_off))
-            # print('false off:    ' + str(false_off))
-            # print('missing off:  ' + str(missing_off))
+            print('correct push: ' + str(correct_push))
+            print('false push:   ' + str(false_push))
+            print('missing push: ' + str(missing_push))
+            print('\ncorrect off:  ' + str(correct_off))
+            print('false off:    ' + str(false_off))
+            print('missing off:  ' + str(missing_off))
 
-            # strike_times = vicon_data[trial]['strike_times']
-            # strike_bin = vicon_data[trial]['strike_bin']
-            # off_times = vicon_data[trial]['off_times']
-            # off_bin = vicon_data[trial]['off_bin']
-            # fs = record_data[trial]['fs']
-            # length_signal = record_data[trial]['length_signal']
-            # spikes_time = record_data[trial]['clusters'][chan][cluster-1].spikes_time
+            strike_times = vicon_data[trial]['strike_times']
+            strike_bin = vicon_data[trial]['strike_bin']
+            off_times = vicon_data[trial]['off_times']
+            off_bin = vicon_data[trial]['off_bin']
+            fs = record_data[trial]['fs']
+            length_signal = record_data[trial]['length_signal']
+            spikes_time = record_data[trial]['clusters'][chan][cluster-1].spikes_time
 
-            #sp.plot_step_spike_classify(strike_times, strike_bin, off_times, off_bin, spike_is_step, spikes_time, length_signal, fs, '_chan'+str(chan)+'_cluster'+str(cluster)+'_trial'+str(trial))
+            sp.plot_step_spike_classify(strike_times, strike_bin, off_times, off_bin, spike_is_step, spikes_time, length_signal, fs, '_chan'+str(chan)+'_cluster'+str(cluster)+'_trial'+str(trial))
 
 
 

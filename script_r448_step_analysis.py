@@ -84,8 +84,10 @@ for chan in my_data:
 
 
         h_stat, pvalue = stats.wilcoxon(v_max,v_min)
-        if pvalue < 0.05:
-            tot_neuron_modulate+=1
+        if pvalue < 0.05 and v_max.mean()-v_min.mean() > 10 and step_spike_fq.shape[0] > 10:
+            tot_neuron_modulate += 1
+        else:
+            print('not chan '+str(chan+1)+' cluster '+str(cluster))
         plt.figure()
         plt.plot(step_spike_fq.mean(0))
         plt.plot((step_spike_fq.mean(0)-step_spike_fq.std(0)/math.sqrt(len(step_spike_fq))), 'b--')
@@ -97,6 +99,8 @@ for chan in my_data:
             plt.show()
         else:
             plt.close()
+
+print tot_neuron_modulate
 plt.figure()
 plt.plot(np.array(global_step).mean(0))
 plt.plot(np.array(global_step).mean(0)-(np.array(global_step).std(0)/math.sqrt(len(global_step))), 'b--')

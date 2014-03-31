@@ -4,20 +4,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
 import copy
+import math
 
 #step initiation frequency analysis
 dir_name = '../data/r448/r448_131022_rH/'
 
-img_ext = '.png'
+img_ext = '.eps'
 save_img = True
 show = False
 # tdt padding in second
 TDT_padding = 2
 sp = sig_proc.Signal_processing(save_img, show, img_ext)
 # number of delta between spike to take for mean comparison to determine wich step it is
-trials = [2, 5, 6, 7]
-nb_block = 5
-block_duration = 0.4
+trials = [2, 5]
+nb_block = 20
+block_duration = 0.2
 first_step_good = {2: [1, 2], 5: [1, 2]}
 
 print('### spikes load ###')
@@ -67,8 +68,10 @@ for trial in trials:
 
 plt.figure()
 plt.plot(np.array(global_count).mean(0))
+plt.plot(np.array(global_count).mean(0)-np.array(global_count).std(0)/math.sqrt(len(global_count)),'b--')
+plt.plot(np.array(global_count).mean(0)+np.array(global_count).std(0)/math.sqrt(len(global_count)),'b--')
 if save_img:
-    plt.savefig('before_first_step_modulation_global_trial_' + img_ext, bbox_inches='tight')
+    plt.savefig('before_first_step_modulation_global' + img_ext, bbox_inches='tight')
 if show:
     plt.show()
 else:

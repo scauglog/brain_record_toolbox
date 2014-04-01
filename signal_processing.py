@@ -70,6 +70,7 @@ class Signal_processing:
         spikes_values = np.array(spikes_values)
         return spikes_values, spikes_time
 
+    #use moving average to smooth spikes
     def smooth_spikes(self, spikes_values, window_size):
         s = []
         window = np.ones(int(window_size)) / float(window_size)
@@ -78,6 +79,7 @@ class Signal_processing:
             s.append(np.convolve(val, window, 'same'))
         return np.array(s)
 
+    #class each spike in the correct cluster and return a list containing class number same size as number of spike
     def classify_spikes(self, spikes_values, spikes_time, clusters, threshold_template):
         spikes_classes = []
         classed_count = 0
@@ -93,6 +95,7 @@ class Signal_processing:
         print ('spike unclassified: ' + str(len(spikes_values) - classed_count))
         return spikes_classes
 
+    #find the best cluster (minimal distance between spike and template) for an observation
     def find_best_cluster(self, obs, clusters, threshold_template):
         best_dist = threshold_template
         best_clus = None
@@ -105,6 +108,7 @@ class Signal_processing:
                 best_dist = dist
         return best_clus
 
+    #plot spike found after threshold some of them can be not a spike
     def plot_spikes(self, spikes_values, spike_count, extra_text=''):
         s = copy.copy(spikes_values).tolist()
         if spike_count > len(s):
@@ -122,6 +126,7 @@ class Signal_processing:
         if not self.show:
             plt.close()
 
+    #plot signal and below a line same height as the cluster the spike belongs to
     def plot_signal_spikes_classified(self, spikes_time, spikes_classes, extra_text=''):
         plt.figure()
         graph_x = [0]
@@ -140,6 +145,7 @@ class Signal_processing:
         if not self.show:
             plt.close()
 
+    #useful to show plot without importing matplotlib
     def show_plot(self):
         if self.show:
             plt.show()
@@ -186,10 +192,12 @@ class Signal_processing:
         y = filtfilt(b, a, data)
         return y
 
+    #usefull to load csv file without using import csv
     def load_csv(self, filename):
         csvfile = open(filename, 'rb')
         return csv.reader(csvfile, delimiter=',', quotechar='"')
 
+    #put exported vicon data (csv file) into a dictionary
     def vicon_extract(self, data, vicon_dict={}):
         events = ['Foot Strike', 'Foot Off', 'Event']
         context = ['Right', 'Left', 'General']
@@ -232,6 +240,9 @@ class Signal_processing:
             cpt += 1
         return vicon_dict
 
+    #correct the time of the vicon data to match with TDT time
+    #because we usually add 2s before vicon start when extracting TDT signal
+    #and vicon have a small delay with TDT (read the delay in ANALOG)
     def synch_vicon_with_TDT(self, vicon_dict, TDT_padding=0):
         #synchronise vicon data with the beginning of the TDT
         events = ['Foot Strike', 'Foot Off', 'Event']
@@ -247,6 +258,7 @@ class Signal_processing:
                 vicon_dict[c][e] = sorted(list_time)
         return vicon_dict
 
+    #for plotting vertical line at each beginning of a step phase
     def binarise_vicon_step(self, steps):
         step_time = [0]
         step_bin = [0]
@@ -260,6 +272,8 @@ class Signal_processing:
 
         return step_time, step_bin
 
+    #cut signal in block and calculate the number of spike that appear during the block length
+    #global_fire is the cumulative count of spike for each block
     def fire_rate(self, all_chan_clusters, length_signal, fs, block_duration):
         global_fire = []
         all_chan_firerates = []
@@ -284,6 +298,7 @@ class Signal_processing:
             all_chan_firerates.append(firerate_chan)
         return all_chan_firerates, global_fire
 
+    #plot fire rate over time of the cluster and above the step phase
     def plot_global_firerate(self, global_fire, strike_time, strike_bin, off_time, off_bin, length_signal, fs,
                              block_duration, extra_txt=''):
         plt.figure()
@@ -293,13 +308,14 @@ class Signal_processing:
         plt.xlim(0, int(length_signal / fs) + 1)
         plt.subplot(2, 1, 2)
         plt.xlim(0, int((length_signal / fs) / block_duration) + 1)
-        plt.plot(global_fire)
+        plt.plot(np.array(global_fire)/block_duration)
 
         if self.save_img:
             plt.savefig('walk_firerate_correlation_global' + extra_txt + self.img_ext, bbox_inches='tight')
         if not self.show:
             plt.close()
 
+    #for each channel plot fire rate of each cluster below step phase
     def plot_all_chan_firerates(self, all_chan_firerates, strike_time, strike_bin, off_time, off_bin, length_signal, fs,
                                 block_duration, extra_txt=''):
         for chan in range(len(all_chan_firerates)):
@@ -311,7 +327,7 @@ class Signal_processing:
             plt.subplot(2, 1, 2)
             plt.xlim(0, int((length_signal / fs) / block_duration) + 1)
             for list_times in all_chan_firerates[chan]:
-                plt.plot(list_times)
+                plt.plot(np.array(list_times)/block_duration)
 
             if self.save_img:
                 plt.savefig('walk_firerate_correlation_chan' + str(chan + 1) + extra_txt + self.img_ext,
@@ -331,6 +347,7 @@ class Signal_processing:
                         steps_time.append([start, end])
         return steps_time
 
+    #return list of complete step (with swing and stance phase)
     def find_full_step_time(self, stance_steps_time, swing_steps_time):
         full_step=[]
         for step_stance in stance_steps_time:
@@ -340,23 +357,24 @@ class Signal_processing:
                     break
         return full_step
 
+    #compare mean (ttest) of firing rate between step phases
     def stat_mean_std_step(self, data_dict):
         stat_dict={}
         for chan in range(len(data_dict)):
             stat_dict[chan] = {}
             for cluster in data_dict[chan]:
-                stat_dict[chan][cluster] = {'all_vs_push': 0, 'all_vs_off': 0, 'push_vs_off': 0}
-                if not len(data_dict[chan][cluster]['all_delta']) == 0 and not len(data_dict[chan][cluster]['push_delta_all_step']) == 0:
-                    t, p = stats.ttest_ind(data_dict[chan][cluster]['all_delta'], data_dict[chan][cluster]['push_delta_all_step'], equal_var=False)
-                    stat_dict[chan][cluster]['all_vs_push'] = p
+                stat_dict[chan][cluster] = {'all_vs_stance': 0, 'all_vs_swing': 0, 'stance_vs_swing': 0}
+                if not len(data_dict[chan][cluster]['all_delta']) == 0 and not len(data_dict[chan][cluster]['stance_delta_all_step']) == 0:
+                    t, p = stats.ttest_ind(data_dict[chan][cluster]['all_delta'], data_dict[chan][cluster]['stance_delta_all_step'], equal_var=False)
+                    stat_dict[chan][cluster]['all_vs_stance'] = p
 
-                if not len(data_dict[chan][cluster]['all_delta']) == 0 and not len(data_dict[chan][cluster]['off_delta_all_step']) == 0:
-                    t, p = stats.ttest_ind(data_dict[chan][cluster]['all_delta'], data_dict[chan][cluster]['off_delta_all_step'], equal_var=False)
-                    stat_dict[chan][cluster]['all_vs_off'] = p
+                if not len(data_dict[chan][cluster]['all_delta']) == 0 and not len(data_dict[chan][cluster]['swing_delta_all_step']) == 0:
+                    t, p = stats.ttest_ind(data_dict[chan][cluster]['all_delta'], data_dict[chan][cluster]['swing_delta_all_step'], equal_var=False)
+                    stat_dict[chan][cluster]['all_vs_swing'] = p
 
-                if not len(data_dict[chan][cluster]['off_delta_all_step']) == 0 and not len(data_dict[chan][cluster]['push_delta_all_step']) == 0:
-                    t, p = stats.ttest_ind(data_dict[chan][cluster]['off_delta_all_step'], data_dict[chan][cluster]['push_delta_all_step'], equal_var=False)
-                    stat_dict[chan][cluster]['push_vs_off'] = p
+                if not len(data_dict[chan][cluster]['swing_delta_all_step']) == 0 and not len(data_dict[chan][cluster]['stance_delta_all_step']) == 0:
+                    t, p = stats.ttest_ind(data_dict[chan][cluster]['swing_delta_all_step'], data_dict[chan][cluster]['stance_delta_all_step'], equal_var=False)
+                    stat_dict[chan][cluster]['stance_vs_swing'] = p
 
         return stat_dict
 
@@ -384,6 +402,7 @@ class Signal_processing:
                 false += 1
         return correct, false, missing
 
+    #
     def find_delta_time_step(self, steps_time, spikes_time, delta_time, fs, max_step_time):
             delta_all_step = []
             delta_each_step = []
@@ -392,12 +411,16 @@ class Signal_processing:
                     if step[1] - step[0] < max_step_time:
                         delta_list = []
                         for j in range(len(spikes_time) - 1):
+                            #if the two spikes append during step then add their delta time in the list
                             if step[0] < spikes_time[j] / fs < step[1] and step[0] < spikes_time[j + 1] / fs < step[1]:
                                 delta_all_step.append(delta_time[j])
                                 delta_list.append(delta_time[j])
                         delta_each_step.append(delta_list)
+            #delta_all_step contain all delta time for this step phase
+            #delta_each_step contain a list of delta time for each step
             return delta_each_step, delta_all_step
 
+    #compare (ttest) spike mean delta time during each step phase
     def cluster_step_ttest(self, all_delta, stance_delta, swing_delta):
         all_vs_stance = 0
         all_vs_swing = 0
@@ -415,19 +438,26 @@ class Signal_processing:
             stance_vs_swing = p
         return all_vs_stance, all_vs_swing, stance_vs_swing
 
+    #for each spike determine in wich step phase it has more probably append
     def class_spike_in_step(self, spikes_time, delta_time, all_mean, stance_mean, swing_mean, window_size, fs):
         tmp_list = []
         stance_spikes_time = []
         swing_spikes_time = []
         other_spikes_time = []
         spike_is_step = []
+        #init list
+        #window size is the number of delta between spike to take for mean comparison to determine which step it is
         for x in range(window_size):
             spike_is_step.append(0)
         for i in range(len(spikes_time)-1):
+            #we add the current delta_time to the list and delete the oldest delta time
             tmp_list.append(delta_time[i])
             if len(tmp_list) > window_size:
                 del tmp_list[0]
 
+            #when we have the correct number of delta_time in the list
+            #we compute the distance between list mean delta and mean of th step phase
+            #we took the smallest distance to define which step phase it is.
             if len(tmp_list) == window_size:
                 err_all = (np.mean(tmp_list) - all_mean)**2
                 err_stance = (np.mean(tmp_list) - stance_mean)**2
@@ -446,10 +476,10 @@ class Signal_processing:
                     print 'error in class_spike_step spike' + spikes_time[i] + ' is not classed'
         return swing_spikes_time, stance_spikes_time, other_spikes_time, spike_is_step
 
-
+    #plot the spike according to step guessed (-1=swing step phase, 1=stance step phase, 0=no step
     def plot_step_spike_classify(self, strike_times, strike_bin, off_times, off_bin, spike_is_step, spikes_time, length_signal, fs, extra_txt=''):
-        plot_x=[0]
-        plot_y=[0]
+        plot_x = [0]
+        plot_y = [0]
         for i in range(len(spike_is_step)):
             plot_x.append(spikes_time[i] / fs)
             plot_y.append(0)
@@ -472,6 +502,8 @@ class Signal_processing:
         if not self.show:
             plt.close()
 
+    #compute spike frequency relative to step duration
+    #phase step duration is normalized and we count the number of spike that append during this period
     def phase_step_spike_fq(self, spikes_time, full_step, nb_block, fs):
         stance_spike_fq=[]
         swing_spike_fq=[]
@@ -485,12 +517,14 @@ class Signal_processing:
                 step_swing_count.append(0)
 
             for spike_time in spikes_time:
+                #if stance phase
                 if step[0] < spike_time/fs < step[1]:
                     list_block = np.arange(step[0], step[1], stance_block_duration)
                     list_block = np.hstack((list_block, step[1]))
                     for i in range(nb_block):
                         if list_block[i] < spike_time/fs < list_block[i+1]:
                             step_stance_count[i] += 1
+                #if swing phase
                 elif step[1] < spike_time/fs < step[2]:
                     list_block = np.arange(step[1], step[2], swing_block_duration)
                     list_block = np.hstack((list_block, step[2]))
@@ -504,6 +538,7 @@ class Signal_processing:
 
         return stance_spike_fq, swing_spike_fq
 
+    #compute spike frequency during initiation period
     def step_initiation_fq(self, spikes_time, step, nb_block, block_duration, fs):
         list_block = []
 

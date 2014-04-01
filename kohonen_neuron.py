@@ -9,7 +9,7 @@ class Neurone:
     def __init__(self, weight_count, max_rnd):
         self.weights = []
         self.weight_count = weight_count
-        #number of time a neuron win used for weighted mean when group neurons
+        #number of time a neuron win, used for weighted mean when group neurons
         self.win_count = 0
         for i in range(self.weight_count):
             self.weights.append(rnd.uniform(-max_rnd, max_rnd))
@@ -22,7 +22,7 @@ class Neurone:
 
     def change_weights(self, dist, obs, alpha):
         for i in range(self.weight_count):
-            #if the neuron is not the best neuron dist > 1, dist is the neighbor distance
+            #if the neuron is not the best neuron dist > 1, dist is the neighborhood distance
             self.weights[i] -= alpha * ((self.weights[i] - obs[i]) * 1 / dist)
 
     def interneuron_dist(self, n2):
@@ -58,6 +58,7 @@ class Kohonen:
             minerror = 1e6
             best_r = 0
             best_c = 0
+            #find the closest neurons to the observation
             for c in range(self.col):
                 for r in range(self.row):
                     error = self.network[c][r].calc_error(obs)
@@ -65,12 +66,14 @@ class Kohonen:
                         minerror = error
                         best_r = r
                         best_c = c
+            #update closest neurons weights and also weight of his neighbor
             for c in range(best_c - self.neighbor, best_c + self.neighbor):
                 for r in range(best_r - self.neighbor, best_r + self.neighbor):
                     if 0 <= c < self.col and 0 <= r < self.row:
                         dist = 1.0 + abs(best_c - c) + abs(best_r - r)
                         self.network[c][r].change_weights(dist, obs, self.alpha)
 
+    #count the number of time each neurons win
     def compute_win_count(self, obs_list):
         win_count = []
         #init table
@@ -80,7 +83,7 @@ class Kohonen:
                 win_count[c].append(0)
                 self.network[c][r].win_count = 0
         self.good_neurons = []
-        #count the number of time a neuron win
+        #for each obs find the best neurons and update his win count
         for obs in obs_list:
             minerror = 0
             best_r = 0
@@ -102,6 +105,7 @@ class Kohonen:
 
         return win_count
 
+    #for each neurons keep a predefined number of closest observation and compute average distance between neurons and observation
     def compute_density(self, obs_list, elements_range):
         dens = []
         for c in range(self.col):
@@ -119,7 +123,7 @@ class Kohonen:
                 dens[c].append(reduce(lambda x, y: x + y, list_dist) / len(list_dist))
         return dens
 
-    #compute density to find center of the cluster.
+    #compute density to find center of the cluster. if we are in a local minimum of density then we are in the center of a cluster
     #TODO better way to find cluster center using density
     def find_cluster_center(self, obs_list, elements_range):
         dens = self.compute_density(obs_list, elements_range)
@@ -137,6 +141,7 @@ class Kohonen:
                     if (dens[c][r] < dens[c - 1][r]) and (dens[c][r] < dens[c + 1][r]) and (dens[c][r] < dens[c][r - 1]) and (dens[c][r] < dens[c][r + 1]):
                         self.groups.append(Group_neuron(self.network[c][r], len(self.groups)))
 
+    #return neurons who win more than threshold (min_win)
     def best_neurons(self, obs_list):
         self.compute_win_count(obs_list)
         for c in range(self.col):
@@ -145,6 +150,7 @@ class Kohonen:
                     self.good_neurons.append(self.network[c][r])
         return self.good_neurons
 
+    #silly way to group neurons, we find the closest neurons and if they are close enough we add them to the closest group
     def group_neurons(self, dist_threshold):
         self.groups = []
         list_n = copy.copy(self.good_neurons)
@@ -161,6 +167,7 @@ class Kohonen:
 
         print('groups found: ' + str(len(self.groups)))
 
+    #find the closest neurons (minimal distance between weight vector)
     def find_closest_neurons(self, list_n):
         first = True
         best_n1 = 0
@@ -181,6 +188,7 @@ class Kohonen:
                         best_n2 = n2
         return best_n1, best_n2
 
+    #find the closest group to a neuron
     def find_closest_group(self, neuron):
         first = True
         best_dist_neuron_gpe = 0
@@ -198,6 +206,7 @@ class Kohonen:
 
         return best_dist_neuron_gpe, best_gpe_neuron
 
+    #put the neuron in the closest group if distance between neuron and group is above the threshold then create a new group
     def classify_neuron(self, list_n, neuron, dist_neuron_gpe, best_gpe_neuron, dist_threshold):
         if len(self.groups) == 0:
             #if no group create a new one
@@ -211,6 +220,7 @@ class Kohonen:
                 self.groups.append(Group_neuron(neuron, len(self.groups)))
                 list_n.remove(neuron)
 
+    #plot weight vector of the network in the same graph
     def plot_network(self, extra_text=''):
         plt.figure()
         plt.suptitle('all neurons weights' + extra_text)
@@ -223,6 +233,7 @@ class Kohonen:
         if not self.show:
             plt.close()
 
+    #same as plot_network (above) but only for the best neurons (win count > threshold)
     def plot_best_neurons(self, extra_text=''):
         plt.figure()
         plt.suptitle('best neurons weights' + extra_text)
@@ -234,6 +245,7 @@ class Kohonen:
         if not self.show:
             plt.close()
 
+    #plot templates of groups in the same graph (template=neuron weight vector average)
     def plot_groups(self, extra_text=''):
         if len(self.groups) != 0:
             plt.figure()
@@ -246,6 +258,7 @@ class Kohonen:
             if not self.show:
                 plt.close()
 
+    #plot x(=spike_count) spike and color them according to the groups they belongs to
     def plot_spikes_classified(self, spikes_values, spike_count, threshold_template, extra_text=''):
         s = copy.copy(spikes_values).tolist()
         if spike_count > len(s):
@@ -271,6 +284,7 @@ class Kohonen:
         if not self.show:
             plt.close()
 
+    #return the closest group of an observation
     def find_best_group(self, obs, threshold_template):
         best_dist = threshold_template
         best_gpe = None
@@ -281,6 +295,7 @@ class Kohonen:
                 best_dist = dist
         return best_gpe
 
+    #if a group of neuron don't win enough we delete the groups
     def evaluate_group(self, spikes_values, threshold_template, threshold_count):
         self.compute_groups_stat(spikes_values, threshold_template)
         tmp = []
@@ -291,12 +306,14 @@ class Kohonen:
 
         print('groups found: ' + str(len(self.groups)))
 
+    #put all observations in the group which they belongs to
     def compute_groups_stat(self, obs, dist_thresh):
         for spike in obs:
             gpe = self.find_best_group(spike, dist_thresh)
             if not (gpe is None):
                 gpe.add_spike(spike)
 
+    #plot group template and std (template=mean of weight vector of neurons)
     def plot_groups_stat(self, extra_text=''):
         if len(self.groups) != 0:
             plt.figure()

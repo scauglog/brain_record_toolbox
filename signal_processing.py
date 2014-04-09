@@ -171,7 +171,7 @@ class Signal_processing:
         koho_map.algo_kohonen(spikes_values)
 
         print('# find best neurons #')
-        koho_map.best_neurons(spikes_values)
+        koho_map.evaluate_neurons(spikes_values)
 
         print('# group neurons #')
         koho_map.group_neurons(dist_treshold)

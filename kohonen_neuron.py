@@ -6,9 +6,11 @@ import copy
 
 
 class Neurone:
-    def __init__(self, weight_count, max_rnd):
+    def __init__(self, weight_count, max_rnd, col=-1, row=-1):
         self.weights = []
         self.weight_count = weight_count
+        self.col = col
+        self.row = row
         #number of time a neuron win, used for weighted mean when group neurons
         self.win_count = 0
         for i in range(self.weight_count):
@@ -51,21 +53,14 @@ class Kohonen:
         for c in range(self.col):
             self.network.append([])
             for r in range(self.row):
-                self.network[c].append(Neurone(weight_count, max_weight))
+                self.network[c].append(Neurone(weight_count, max_weight, c, r))
 
     def algo_kohonen(self, obs_list):
         for obs in obs_list:
-            minerror = 1e6
-            best_r = 0
-            best_c = 0
-            #find the closest neurons to the observation
-            for c in range(self.col):
-                for r in range(self.row):
-                    error = self.network[c][r].calc_error(obs)
-                    if error < minerror:
-                        minerror = error
-                        best_r = r
-                        best_c = c
+            best_n = self.find_best_neuron(obs)
+            best_c = best_n.col
+            best_r = best_n.row
+
             #update closest neurons weights and also weight of his neighbor
             for c in range(best_c - self.neighbor, best_c + self.neighbor):
                 for r in range(best_r - self.neighbor, best_r + self.neighbor):
@@ -85,25 +80,25 @@ class Kohonen:
         self.good_neurons = []
         #for each obs find the best neurons and update his win count
         for obs in obs_list:
-            minerror = 0
-            best_r = 0
-            best_c = 0
-            first = True
-            for c in range(self.col):
-                for r in range(self.row):
-                    error = self.network[c][r].calc_error(obs)
-                    if first:
-                        first = False
-                        minerror = error
-
-                    if error < minerror:
-                        minerror = error
-                        best_r = r
-                        best_c = c
-            win_count[best_c][best_r] += 1
-            self.network[best_c][best_r].win_count += 1
+            best_n = self.find_best_neuron(obs)
+            win_count[best_n.col][best_n.row] += 1
+            best_n.win_count += 1
 
         return win_count
+
+    #return the best neurons for the obs
+    def find_best_neuron(self, obs):
+        best_n = self.network[0][0]
+        minerror = best_n.calc_error(obs)
+
+        for c in range(self.col):
+            for r in range(self.row):
+                n = self.network[c][r]
+                error = n.calc_error(obs)
+                if error < minerror:
+                    minerror = error
+                    best_n = n
+        return best_n
 
     #for each neurons keep a predefined number of closest observation and compute average distance between neurons and observation
     def compute_density(self, obs_list, elements_range):
@@ -142,7 +137,7 @@ class Kohonen:
                         self.groups.append(Group_neuron(self.network[c][r], len(self.groups)))
 
     #return neurons who win more than threshold (min_win)
-    def best_neurons(self, obs_list):
+    def evaluate_neurons(self, obs_list):
         self.compute_win_count(obs_list)
         for c in range(self.col):
             for r in range(self.row):
@@ -188,7 +183,7 @@ class Kohonen:
             best_g1.merge_group(best_g2)
             self.groups.remove(best_g2)
 
-    #find the closest neurons (minimal distance between weight vector)
+    #find the closest neurons to another neurons (minimal distance between weight vector)
     def find_closest_neurons(self, list_n):
         first = True
         best_n1 = 0
@@ -306,24 +301,18 @@ class Kohonen:
             plt.close()
 
     #return the closest group of an observation
-    def find_best_group(self, obs, threshold_template):
-        best_dist = threshold_template
-        best_gpe = None
+    def find_best_group(self, obs, threshold_template=-1):
+        # best_dist = threshold_template
+        # best_gpe = None
+        best_dist = self.groups[0].min_dist(obs)
+        best_gpe = self.groups[0]
         for gpe in self.groups:
             dist = gpe.dist(obs)
             if dist < best_dist:
                 best_gpe = gpe
                 best_dist = dist
-        return best_gpe
-
-    def find_group_min_dist(self, obs):
-        best_dist = self.groups[0].min_dist(obs)
-        best_gpe = self.groups[0]
-        for gpe in self.groups:
-            dist = gpe.min_dist(obs)
-            if dist < best_dist:
-                best_gpe = gpe
-                best_dist = dist
+        if 0 < threshold_template < best_dist:
+            best_gpe = None
         return best_gpe
 
     #if a group of neuron don't win enough we delete the groups

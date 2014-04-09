@@ -15,7 +15,8 @@ class Neuron:
     def sigmoid(self, s):
         try:
             s = round(s, 6)
-            return 1 / (1 + math.exp(-s))
+            # return 1 / (1 + math.exp(-s))
+            return math.tanh(s)
         except OverflowError:
             print 'overflow'
             return sys.float_info.min
@@ -23,7 +24,8 @@ class Neuron:
     def sigmoidDerivate(self, s):
         try:
             s = round(s, 6)
-            return math.exp(-s)/((1+math.exp(-s))**2)
+            # return math.exp(-s)/((1+math.exp(-s))**2)
+            return 1-s**2
         except OverflowError:
             print 'overflow'
             return sys.float_info.min

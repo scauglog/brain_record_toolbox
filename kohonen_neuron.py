@@ -167,6 +167,27 @@ class Kohonen:
 
         print('groups found: ' + str(len(self.groups)))
 
+    def group_neuron_into_x_class(self, class_count):
+        self.groups = []
+        list_n = self.good_neurons
+        for n in list_n:
+            self.groups.append(Group_neuron(n, len(self.groups)))
+
+        while len(self.groups) > class_count:
+            best_g1 = self.groups[0]
+            best_g2 = self.groups[1]
+            best_dst = best_g1.dist(best_g2.template)
+            for g1 in self.groups:
+                for g2 in self.groups:
+                    if g1 != g2:
+                        dst = g1.dist(g2.template)
+                        if dst < best_dst:
+                            best_dst = dst
+                            best_g1 = g1
+                            best_g2 = g2
+            best_g1.merge_group(best_g2)
+            self.groups.remove(best_g2)
+
     #find the closest neurons (minimal distance between weight vector)
     def find_closest_neurons(self, list_n):
         first = True
@@ -295,6 +316,16 @@ class Kohonen:
                 best_dist = dist
         return best_gpe
 
+    def find_group_min_dist(self, obs):
+        best_dist = self.groups[0].min_dist(obs)
+        best_gpe = self.groups[0]
+        for gpe in self.groups:
+            dist = gpe.min_dist(obs)
+            if dist < best_dist:
+                best_gpe = gpe
+                best_dist = dist
+        return best_gpe
+
     #if a group of neuron don't win enough we delete the groups
     def evaluate_group(self, spikes_values, threshold_template, threshold_count):
         self.compute_groups_stat(spikes_values, threshold_template)
@@ -342,6 +373,11 @@ class Group_neuron:
         self.neurons.append(neuron)
         self.compute_template()
 
+    def merge_group(self, group):
+        for n in group.neurons:
+            self.neurons.append(n)
+        self.compute_template()
+
     def compute_template(self):
         sum_template = self.template * 0
         count = 0
@@ -355,6 +391,14 @@ class Group_neuron:
         for i in range(len(self.template)):
             dist += (self.template[i] - val[i]) ** 2
         return math.sqrt(dist)
+
+    def min_dist(self, val):
+        best_dist = self.neurons[0].weights_dist(val)
+        for n in self.neurons:
+            dist = n.weights_dist(val)
+            if dist < best_dist:
+                best_dist = dist
+        return best_dist
 
     def add_spike(self, spike):
         self.spikes.append(spike)

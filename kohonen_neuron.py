@@ -55,7 +55,7 @@ class Kohonen:
             for r in range(self.row):
                 self.network[c].append(Neurone(weight_count, max_weight, c, r))
 
-    def algo_kohonen(self, obs_list):
+    def algo_kohonen(self, obs_list, neighbord_decrease=True):
         for obs in obs_list:
             best_n = self.find_best_neuron(obs)
             best_c = best_n.col
@@ -65,7 +65,10 @@ class Kohonen:
             for c in range(best_c - self.neighbor, best_c + self.neighbor):
                 for r in range(best_r - self.neighbor, best_r + self.neighbor):
                     if 0 <= c < self.col and 0 <= r < self.row:
-                        dist = 1.0 + abs(best_c - c) + abs(best_r - r)
+                        if neighbord_decrease:
+                            dist = 1.0 + abs(best_c - c) + abs(best_r - r)
+                        else:
+                            dist = 1.0
                         self.network[c][r].change_weights(dist, obs, self.alpha)
 
     #count the number of time each neurons win
@@ -99,6 +102,18 @@ class Kohonen:
                     minerror = error
                     best_n = n
         return best_n
+    def find_mean_best_dist(self, obs, elements_range):
+        best_dist = []
+        for c in range(self.col):
+            for r in range(self.row):
+                n = self.network[c][r]
+                best_dist.append(n.calc_error(obs))
+        best_dist.sort()
+
+        if len(best_dist) > elements_range:
+            best_dist = best_dist[0:elements_range]
+        mean = reduce(lambda x, y: x + y, best_dist)/float(len(best_dist))
+        return mean
 
     #for each neurons keep a predefined number of closest observation and compute average distance between neurons and observation
     def compute_density(self, obs_list, elements_range):
@@ -115,7 +130,7 @@ class Kohonen:
                     elements_range = len(list_dist)
                 list_dist = list_dist[0:elements_range]
                 #store mean of dist
-                dens[c].append(reduce(lambda x, y: x + y, list_dist) / len(list_dist))
+                dens[c].append(reduce(lambda x, y: x + y, list_dist) / float(len(list_dist)))
         return dens
 
     #compute density to find center of the cluster. if we are in a local minimum of density then we are in the center of a cluster

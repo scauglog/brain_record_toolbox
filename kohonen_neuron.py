@@ -55,7 +55,7 @@ class Kohonen:
             for r in range(self.row):
                 self.network[c].append(Neurone(weight_count, max_weight, c, r))
 
-    def algo_kohonen(self, obs_list, neighbord_decrease=True):
+    def algo_kohonen(self, obs_list, neighbor_decrease=True):
         for obs in obs_list:
             best_n = self.find_best_neuron(obs)
             best_c = best_n.col
@@ -65,7 +65,7 @@ class Kohonen:
             for c in range(best_c - self.neighbor, best_c + self.neighbor):
                 for r in range(best_r - self.neighbor, best_r + self.neighbor):
                     if 0 <= c < self.col and 0 <= r < self.row:
-                        if neighbord_decrease:
+                        if neighbor_decrease:
                             dist = 1.0 + abs(best_c - c) + abs(best_r - r)
                         else:
                             dist = 1.0

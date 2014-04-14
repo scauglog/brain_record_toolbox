@@ -1,137 +1,189 @@
-import mlp
 import kohonen_neuron as kn
 import csv
-import pickle
-import time
+import numpy as np
 import copy
+import random as rnd
+import math
 
-save_obj=True
-l_obs = []
-l_res = []
-alpha = 0.1
-koho_row = 20
-koho_col = 5
+def convert_file(date, files, init_tail, isHealthy=False):
+    l_obs = []
+    l_res = []
+    if isHealthy:
+        stop = ['1']
+        init = ['']
+        walk = ['2', '-2']
+    else:
+        stop = ['0', '3', '4']
+        init = ['-2']
+        walk = ['1', '2']
+
+    for f in files:
+        filename = 'r31/'+date+'healthyOutput_'+str(f)+'.txt'
+        csvfile = open(filename, 'rb')
+        file = csv.reader(csvfile, delimiter=' ', quotechar='"')
+        #grab expected result in file and convert, grab input data
+        for row in file:
+            if len(row) > 7 and row[0] != '0':
+                if isHealthy:
+                    ratState = row[3]
+                else:
+                    ratState = row[5]
+
+                if ratState in stop:
+                    l_res.append([1, 0, 0])
+                    l_obs.append(map(float, row[7:128+7]))
+                elif ratState in init:
+                    l_res.append([0, 1, 0])
+                    l_obs.append(map(float, row[7:128+7]))
+                elif ratState in walk:
+                    l_res.append([0, 0, 1])
+                    l_obs.append(map(float, row[7:128+7]))
+        if isHealthy and False:
+            for i in range(1, len(l_res)):
+                if l_res[i] == [0, 0, 1] and l_res[i-1] == [1, 0, 0]:
+                    for j in range(i-init_tail, i):
+                        l_res[j] = [0, 1, 0]
+
+        l_obs_d=[]
+        l_obs_d.append([])
+        for i in range(1, len(l_obs)):
+            l_obs_d.append(np.array(l_obs[i])-np.array(l_obs[i-1]))
+    return (l_res, l_obs)
+
+def test(l_obs, l_res, koho, dist_count, print_res=True):
+    good = 0
+    history_length = 1
+    history = np.array([[1, 0, 0]])
+    for i in range(len(l_obs)):
+        dist_res = []
+        for k in koho:
+            dist_res.append(k.find_mean_best_dist(l_obs[i], dist_count))
+
+        rank = dist_res.index(min(dist_res))
+        res = [0, 0, 0]
+        res[rank] = 1
+        history = np.vstack((history, res))
+
+        if history.shape[0] > history_length:
+            history = history[1:, :]
+
+        rank = history.mean(0).argmax()
+        res = [0, 0, 0]
+        res[rank] = 1
+
+        if res == l_res[i]:
+            good += 1
+        if print_res:
+            print(res, l_res[i], dist_res)
+    if len(l_obs) > 0:
+        return good/float(len(l_obs))
+    else:
+        print ('l_obs is empty')
+    return good
+
+def simulated_annealing(koho, l_obs, l_obs_koho, dist_count, max_success, max_iteration):
+    success = test(l_obs, l_res, koho, dist_count, False)
+    alpha = 0.1
+    # Lambda = 0.9
+    n = 0
+    while success <= max_success and n < max_iteration:
+        koho_cp = copy.copy(koho)
+        for i in range(len(koho_cp)):
+            koho_cp[i].alpha = alpha
+            koho_cp[i].algo_kohonen(l_obs_koho[i])
+        success_cp = test(l_obs, l_res, koho_cp, dist_count, False)
+        print '---'
+        print n
+        print alpha
+        print success_cp
+        print math.exp(-(success-success_cp)/(alpha*1.0))
+        if math.exp(-abs(success-success_cp)/(alpha*1.0)) in [0.0, 1.0]:
+            print 'break'
+            break
+        if success < success_cp or rnd.random() < math.exp(-abs(success-success_cp)/(alpha*1.0)):
+            success = copy.copy(success_cp)
+            koho = copy.copy(koho_cp)
+
+        if n % 7 == 0:
+            alpha /= 10.0
+        # alpha *= Lambda
+        n += 1
+        #Temp *= Lambda
+
+
+def obs_classify(l_obs,l_res):
+    l_obs_stop = []
+    l_obs_init = []
+    l_obs_walk = []
+    for i in range(len(l_res)):
+        if l_res[i] == [1, 0, 0]:
+            l_obs_stop.append(l_obs[i])
+        elif l_res[i] == [0, 1, 0]:
+            l_obs_init.append(l_obs[i])
+        elif l_res[i] == [0, 0, 1]:
+            l_obs_walk.append(l_obs[i])
+    return [l_obs_stop, l_obs_init, l_obs_walk]
+
+#####################
+######  START  ######
+save_obj = False
+#koho_parameter
+alpha = 0.01
+koho_row = 7
+koho_col = 7
 neighbor = 3
 min_win = 4
 ext_img = '.png'
 save = False
 show = False
 init_tail = 5
+#number of best neurons to keep for calculate distance of obs to the network
+dist_count = 5
+#A = np.matrix([[0.45, 0.45, 0.1], [0.1547, 0.2119, 0.6333], [0.25, 0.05, 0.7]])
+##### r32
 #11/26
-files1126 = [32, 33, 34, 35, 37, 38, 39, 40, 42, 43, 44, 45, 46, 48, 49, 50, 53, 54, 55, 56, 57, 58, 59, 60]
+# files1126 = [32, 33, 34, 35, 37, 38, 39, 40, 42, 43, 44, 45, 46, 48, 49, 50, 53, 54, 55, 56, 57, 58, 59, 60]
 #11/27
-files1127 = [57, 58, 59, 60, 61, 63, 64, 65, 66, 67, 69, 71, 72, 73, 74, 75, 76, 77, 78, 79, 81, 82, 83, 84, 86]
+# files1127 = [57, 58, 59, 60, 61, 63, 64, 65, 66, 67, 69, 71, 72, 73, 74, 75, 76, 77, 78, 79, 81, 82, 83, 84, 86]
 #12/03 SCI
-files1203 = [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51]
+# files1203 = [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51]
 
-date = '1126'
-files = files1126[0:9]
-for f in files:
-    filename = 'r32/'+date+'healthyOutput_'+str(f)+'.txt'
-    csvfile = open(filename, 'rb')
-    file = csv.reader(csvfile, delimiter=' ', quotechar='"')
-    #grab expected result in file and convert, grab input data
-    for row in file:
-        if len(row) > 7:
-            ratState = row[3]
-            if ratState == '1':
-                l_res.append([1, 0, 0])
-                l_obs.append(map(float, row[7:128+7]))
-            elif ratState == '-2':
-                l_res.append([0, 1, 0])
-                l_obs.append(map(float, row[7:128+7]))
-            elif ratState == '2':
-                l_res.append([0, 0, 1])
-                l_obs.append(map(float, row[7:128+7]))
+##### r31
+#11/26
+files1126 = [88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123]
+#11/27
+files1127 = [91, 92, 93, 94, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 111, 112, 114, 115, 116]
+#12/03
+files1203 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 52, 53, 54, 55, 56, 57]
 
-    for i in range(1, len(l_res)):
-        if l_res[i] == [0, 0, 1] and l_res[i-1] == [1, 0, 0]:
-            for j in range(i-init_tail, i):
-                l_res[j] = [0, 1, 0]
-perceptron = mlp.Network([129, 64, 32, 16, 3])
-for i in range(5):
-    print i
-    start = time.time()
-    perceptron.backprop(alpha, l_obs, l_res)
-    end = time.time()
-    print(end-start)
+#build the network
+koho_stop = kn.Kohonen(koho_row, koho_col, 128, 5, alpha, neighbor, min_win, ext_img, save, show)
+koho_init = kn.Kohonen(koho_row, koho_col, 128, 5, alpha, neighbor, min_win, ext_img, save, show)
+koho_walk = kn.Kohonen(koho_row, koho_col, 128, 5, alpha, neighbor, min_win, ext_img, save, show)
+koho = [koho_stop, koho_init, koho_walk]
 
-good = 0.0
-for i in range(len(l_obs)):
-    perceptron.run(l_obs[i])
-    res = [0, 0, 0]
-    rank = perceptron.output().index(max(perceptron.output()))
-    res[rank] = 1
-    print(res,l_res[i])
-    if res == l_res[i]:
-        good += 1
+print ('--------- Train healthy ---------')
+l_res, l_obs = convert_file('1127', files1127[0:20], init_tail, True)
+l_obs_koho = obs_classify(l_obs, l_res)
+simulated_annealing(koho, l_obs, l_obs_koho, dist_count, 0.80, 42)
 
-print good/float(len(l_obs))
+#test healthy
+l_res, l_obs = convert_file('1127', files1127[20:22], init_tail, True)
+print test(l_obs, l_res, koho, dist_count)
+print '--------- end ---------'
 
-# koho=kn.Kohonen(koho_row, koho_col, 128, 5, alpha, neighbor, min_win, ext_img, save, show)
-#
-# for i in range(10):
-#     print i
-#     start = time.time()
-#     koho.algo_kohonen(l_obs)
-#     end = time.time()
-#     print(end-start)
-# koho.best_neurons(l_obs)
-# koho.group_neuron_into_x_class(10)
-#
-# gpe_label = {}
-# for g in koho.groups:
-#     gpe_label[g.number] = {1: 0, 2: 0, 3: 0}
-#
-# for i in range(len(l_obs)):
-#     gpe_res = koho.find_group_min_dist(l_obs[i])
-#     if l_res[i] == [1, 0, 0]:
-#         gpe_label[gpe_res.number][1] += 1
-#     elif l_res[i] == [0, 1, 0]:
-#         gpe_label[gpe_res.number][2] += 1
-#     elif l_res[i] == [0, 0, 1]:
-#         gpe_label[gpe_res.number][3] += 1
-#
-# for k1 in gpe_label:
-#     sum_obs = 0.0
-#     sum_obs += gpe_label[k1][1]
-#     sum_obs += gpe_label[k1][2]
-#     sum_obs += gpe_label[k1][3]
-#     gpe_label[k1][1] /= sum_obs
-#     gpe_label[k1][2] /= sum_obs
-#     gpe_label[k1][3] /= sum_obs
-# print gpe_label
-#
-# mlp_obs = []
-# mlp_res = []
-# tmp_list = []
-# for i in range(len(l_obs)):
-#     gpe = koho.find_group_min_dist(l_obs[i])
-#     for v in gpe_label[gpe.number].values():
-#         tmp_list.append(v)
-#     if len(tmp_list) > 9:
-#         del tmp_list[0]
-#         del tmp_list[0]
-#         del tmp_list[0]
-#         mlp_obs.append(copy.copy(tmp_list))
-#         mlp_res.append(l_res[i])
-#
-#
-# perceptron = mlp.Network([10, 10, 10, 3])
-# for i in range(10):
-#     perceptron.backprop(alpha, mlp_obs, mlp_res)
-#
-# good = 0.0
-# for i in range(len(mlp_obs)):
-#     perceptron.run(mlp_obs[i])
-#     res = [0, 0, 0]
-#     rank = perceptron.output().index(max(perceptron.output()))
-#     res[rank] = 1
-#     print(res,mlp_res[i])
-#     if res == mlp_res[i]:
-#         good += 1
-#
-# print good/float(len(mlp_obs))
+#train for SCI
+print('--------- Train SCI ---------')
+l_res, l_obs = convert_file('1203', files1203[12:22], init_tail, False)
+l_obs_koho = obs_classify(l_obs, l_res)
+simulated_annealing(koho, l_obs, l_obs_koho, dist_count, 0.70, 42)
+
+#test SCI
+l_res, l_obs = convert_file('1203', files1203[23:25], init_tail, False)
+print test(l_obs, l_res, koho, dist_count)
+print '--------- end Train SCI ---------'
+
+
 
 print('###############')
 print('####  END  ####')

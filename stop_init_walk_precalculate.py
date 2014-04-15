@@ -1,10 +1,10 @@
-import kohonen_neuron as kn
 import csv
 import numpy as np
 import copy
 import random as rnd
 import math
 import pickle
+import time
 
 def convert_file(date, files, init_tail, isHealthy=False):
     l_obs = []
@@ -55,10 +55,10 @@ def test(l_obs, l_res, koho, dist_count, print_res=True):
     good = 0
     history_length = 3
     history = np.array([[1, 0, 0]])
-    prevP=np.array([1,0,0])
-    A = np.array([[0.6, 0.1, 0.3], [0.1, 0.5, 0.4], [0.3, 0.1, 0.6]])
+    dtime=[]
     for i in range(len(l_obs)):
         dist_res = []
+        start_t = time.time()
         for k in koho:
             dist_res.append(k.find_mean_best_dist(l_obs[i], dist_count))
 
@@ -73,11 +73,14 @@ def test(l_obs, l_res, koho, dist_count, print_res=True):
         rank = history.mean(0).argmax()
         res = [0, 0, 0]
         res[rank] = 1
-
+        end_t = time.time()
+        dtime.append(end_t-start_t)
         if res == l_res[i]:
             good += 1
         if print_res:
             print(res, l_res[i], dist_res)
+    print dtime
+    print np.array(dtime).mean()
     if len(l_obs) > 0:
         return good/float(len(l_obs))
     else:
@@ -132,19 +135,14 @@ def obs_classify(l_obs,l_res):
 
 #####################
 ######  START  ######
-save_obj = True
-#koho_parameter
-alpha = 0.01
-koho_row = 7
-koho_col = 7
 neighbor = 2
-min_win = 4
 ext_img = '.png'
 save = False
 show = False
 init_tail = 5
 #number of best neurons to keep for calculate distance of obs to the network
 dist_count = 3
+save_obj = False
 #A = np.matrix([[0.45, 0.45, 0.1], [0.1547, 0.2119, 0.6333], [0.25, 0.05, 0.7]])
 ##### r32
 #11/26
@@ -162,38 +160,18 @@ files1127 = [91, 92, 93, 94, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107,
 #12/03
 files1203 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 52, 53, 54, 55, 56, 57]
 
-#build the network
-koho_stop = kn.Kohonen(koho_row, koho_col, 128, 5, alpha, neighbor, min_win, ext_img, save, show)
-koho_init = kn.Kohonen(koho_row, koho_col, 128, 5, alpha, neighbor, min_win, ext_img, save, show)
-koho_walk = kn.Kohonen(koho_row, koho_col, 128, 5, alpha, neighbor, min_win, ext_img, save, show)
-koho = [koho_stop, koho_init, koho_walk]
+dir_name = ''
+with open(dir_name + 'koho_networks_v1', 'rb') as my_file:
+    koho = pickle.load(my_file)
 
-print ('--------- Train healthy ---------')
-l_res, l_obs = convert_file('1127', files1127[0:20], init_tail, True)
-l_obs_koho = obs_classify(l_obs, l_res)
-simulated_annealing(koho, l_obs, l_obs_koho, dist_count, 0.80, 42)
-
-#test healthy
-l_res, l_obs = convert_file('1127', files1127[20:22], init_tail, True)
-print test(l_obs, l_res, koho, dist_count)
-print '--------- end ---------'
-
-#train for SCI
-print('--------- Train SCI ---------')
-l_res, l_obs = convert_file('1203', files1203[12:22], init_tail, False)
+l_res, l_obs = convert_file('1203', files1203[25:27], init_tail, False)
 l_obs_koho = obs_classify(l_obs, l_res)
 simulated_annealing(koho, l_obs, l_obs_koho, dist_count, 0.70, 42)
 
-#test SCI
-l_res, l_obs = convert_file('1203', files1203[23:25], init_tail, False)
+l_res, l_obs = convert_file('1203', files1203[28:29], init_tail, False)
 print test(l_obs, l_res, koho, dist_count)
-print '--------- end Train SCI ---------'
 
-dir_name = ''
 if save_obj:
-    with open(dir_name + 'koho_networks', 'wb') as my_file:
+    with open(dir_name + 'koho_networks_v2', 'wb') as my_file:
         my_pickler = pickle.Pickler(my_file)
         my_pickler.dump(koho)
-
-print('###############')
-print('####  END  ####')

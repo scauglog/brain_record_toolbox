@@ -9,11 +9,14 @@ import pickle
 def convert_file(date, files, init_tail, isHealthy=False):
     l_obs = []
     l_res = []
+    #read 'howto file reading' to understand
     if isHealthy:
+        #col 4
         stop = ['1']
         init = ['']
         walk = ['2', '-2']
     else:
+        #col 6
         stop = ['0', '3', '4']
         init = ['-2']
         walk = ['1', '2']
@@ -25,6 +28,7 @@ def convert_file(date, files, init_tail, isHealthy=False):
         #grab expected result in file and convert, grab input data
         for row in file:
             if len(row) > 7 and row[0] != '0':
+                #if rat is healthy walk state are in col 4 otherwise in col 6 see 'howto file reading file'
                 if isHealthy:
                     ratState = row[3]
                 else:
@@ -39,6 +43,7 @@ def convert_file(date, files, init_tail, isHealthy=False):
                 elif ratState in walk:
                     l_res.append([0, 0, 1])
                     l_obs.append(map(float, row[7:128+7]))
+        #set to init state the state before walk (currently deactivated)
         if isHealthy and False:
             for i in range(1, len(l_res)):
                 if l_res[i] == [0, 0, 1] and l_res[i-1] == [1, 0, 0]:
@@ -53,23 +58,26 @@ def convert_file(date, files, init_tail, isHealthy=False):
 
 def test(l_obs, l_res, koho, dist_count, print_res=True):
     good = 0
+    #history length should be an odd number
     history_length = 3
     history = np.array([[1, 0, 0]])
-    prevP=np.array([1,0,0])
-    A = np.array([[0.6, 0.1, 0.3], [0.1, 0.5, 0.4], [0.3, 0.1, 0.6]])
     for i in range(len(l_obs)):
         dist_res = []
+        #find the distance of the obs to each network
         for k in koho:
             dist_res.append(k.find_mean_best_dist(l_obs[i], dist_count))
 
+        #transform result in array 0 or 1
         rank = dist_res.index(min(dist_res))
         res = [0, 0, 0]
         res[rank] = 1
-        history = np.vstack((history, res))
 
+        #use history to smooth change
+        history = np.vstack((history, res))
         if history.shape[0] > history_length:
             history = history[1:, :]
 
+        #transform result in array 0 or 1
         rank = history.mean(0).argmax()
         res = [0, 0, 0]
         res[rank] = 1
@@ -85,39 +93,53 @@ def test(l_obs, l_res, koho, dist_count, print_res=True):
     return good
 
 def simulated_annealing(koho, l_obs, l_obs_koho, dist_count, max_success, max_iteration):
+    #inspired from simulated annealing, to determine when we should stop learning
+    #initialize
     success = test(l_obs, l_res, koho, dist_count, False)
+    #learning coefficient of networks
     alpha = 0.1
+    #change alpha each X iteration
+    change_alpha_iteration = 7
+    #change alpha by a factor of
+    #/!\ should be float
+    change_alpha_factor = 10.0
     # Lambda = 0.9
     n = 0
     while success <= max_success and n < max_iteration:
         koho_cp = copy.copy(koho)
+        #train each kohonen network
         for i in range(len(koho_cp)):
+            #update learning coefficient
             koho_cp[i].alpha = alpha
             #no neighbor decrease for the first iteration
             if n == 0:
                 koho_cp[i].algo_kohonen(l_obs_koho[i], False)
             else:
                 koho_cp[i].algo_kohonen(l_obs_koho[i])
+        #compute success of the networks
         success_cp = test(l_obs, l_res, koho_cp, dist_count, False)
+
         print '---'
         print n
         print alpha
         print success_cp
         print math.exp(-(success-success_cp)/(alpha*1.0))
+        #if we keep the same network for too long we go there
         if math.exp(-abs(success-success_cp)/(alpha*1.0)) in [0.0, 1.0]:
             print 'break'
             break
+        #simulated annealing criterion to keep or not the trained network
         if success < success_cp or rnd.random() < math.exp(-abs(success-success_cp)/(alpha*1.0)):
             success = copy.copy(success_cp)
             koho = copy.copy(koho_cp)
 
-        if n % 7 == 0:
-            alpha /= 10.0
-        # alpha *= Lambda
+        #learning rate decrease over iteration
+        #change learning rate
+        if n % change_alpha_iteration == 0:
+            alpha /= change_alpha_factor
         n += 1
-        #Temp *= Lambda
 
-def obs_classify(l_obs,l_res):
+def obs_classify(l_obs, l_res):
     l_obs_stop = []
     l_obs_init = []
     l_obs_walk = []
@@ -137,11 +159,15 @@ save_obj = True
 alpha = 0.01
 koho_row = 7
 koho_col = 7
+#number of neighbor to update in the network
 neighbor = 2
+#min winning count to be consider as a good neuron
 min_win = 4
+#end koho parameter
 ext_img = '.png'
 save = False
 show = False
+#number of record to set to init before walk
 init_tail = 5
 #number of best neurons to keep for calculate distance of obs to the network
 dist_count = 3
@@ -171,6 +197,7 @@ koho = [koho_stop, koho_init, koho_walk]
 print ('--------- Train healthy ---------')
 l_res, l_obs = convert_file('1127', files1127[0:20], init_tail, True)
 l_obs_koho = obs_classify(l_obs, l_res)
+#train networks
 simulated_annealing(koho, l_obs, l_obs_koho, dist_count, 0.80, 42)
 
 #test healthy
@@ -178,10 +205,10 @@ l_res, l_obs = convert_file('1127', files1127[20:22], init_tail, True)
 print test(l_obs, l_res, koho, dist_count)
 print '--------- end ---------'
 
-#train for SCI
 print('--------- Train SCI ---------')
 l_res, l_obs = convert_file('1203', files1203[12:22], init_tail, False)
 l_obs_koho = obs_classify(l_obs, l_res)
+#train networks
 simulated_annealing(koho, l_obs, l_obs_koho, dist_count, 0.70, 42)
 
 #test SCI
@@ -189,6 +216,7 @@ l_res, l_obs = convert_file('1203', files1203[23:25], init_tail, False)
 print test(l_obs, l_res, koho, dist_count)
 print '--------- end Train SCI ---------'
 
+#save networks
 dir_name = ''
 if save_obj:
     with open(dir_name + 'koho_networks', 'wb') as my_file:

@@ -115,6 +115,21 @@ class Kohonen:
         mean = reduce(lambda x, y: x + y, best_dist)/float(len(best_dist))
         return mean
 
+    def find_best_X_neurons(self, obs, elements_range):
+        best_n = []
+        best_d = []
+        for c in range(self.col):
+            for r in range(self.row):
+                n = self.network[c][r]
+                d = n.calc_error(obs)
+                best_n.append(n)
+                best_d.append(d)
+                if len(best_d) > elements_range:
+                    arg_max_d = best_d.index(max(best_d))
+                    del best_n[arg_max_d]
+                    del best_d[arg_max_d]
+        return best_n
+
     #for each neurons keep a predefined number of closest observation and compute average distance between neurons and observation
     def compute_density(self, obs_list, elements_range):
         dens = []

@@ -58,13 +58,13 @@ class brain_state_calculate:
     def load_networks(self, koho):
         self.koho = koho
 
-    def convert_file(self, date, files, isHealthy=False):
+    def convert_file(self, dir_name, date, files, isHealthy=False,file_core_name='healthyOutput_'):
         l_obs = []
         l_res = []
         #read 'howto file reading' to understand
         if isHealthy:
             #col 4
-            stop = ['1']
+            stop = ['1', '-4']
             walk = ['2', '-2']
         else:
             #col 6
@@ -72,7 +72,7 @@ class brain_state_calculate:
             walk = ['1', '2']
 
         for f in files:
-            filename = 'r32/'+date+'healthyOutput_'+str(f)+'.txt'
+            filename = dir_name+date+file_core_name+str(f)+'.txt'
             csvfile = open(filename, 'rb')
             file = csv.reader(csvfile, delimiter=' ', quotechar='"')
             #grab expected result in file and convert, grab input data
@@ -86,12 +86,14 @@ class brain_state_calculate:
 
                     #add brain state to l_obs and convert number to float
                     brain_state = self.convert_brain_state(row[self.first_chan:self.chan_count+self.first_chan])
-                    if ratState in stop:
-                        l_res.append(self.stop)
-                        l_obs.append(brain_state)
-                    elif ratState in walk:
-                        l_res.append(self.walk)
-                        l_obs.append(brain_state)
+                    #'-1' added to ignore time where the rat is in the air added by 'add_ground_truth'
+                    if row[5] != '-1':
+                        if ratState in stop:
+                            l_res.append(self.stop)
+                            l_obs.append(brain_state)
+                        elif ratState in walk:
+                            l_res.append(self.walk)
+                            l_obs.append(brain_state)
 
             # derivative of l_obs
             # l_obs_d = []
@@ -168,6 +170,32 @@ class brain_state_calculate:
             elif l_res[i] == self.walk and list_of_res[2][i] == self.walk.index(1):
                 l_obs_walk.append(l_obs[i])
                 self.add_extra_obs(l_obs, l_res, obs_to_add, list_of_res, i, self.walk, l_obs_walk)
+
+        return [l_obs_stop, l_obs_walk]
+
+    def obs_classify_prev_res(self, l_obs, l_res, obs_to_add):
+        #we class obs using only the previous result no ground truth involved here
+        #we need ground truth to call test
+        l_obs_stop = []
+        l_obs_walk = []
+        success, list_of_res = self.test(l_obs, l_res, True)
+        #list_of_res
+        #0 = res expected
+        #1 = res calculate before HMM
+        #2 = res calculate after HMM
+        for i in range(1, len(l_obs)-1):
+            if list_of_res[2][i] == self.stop.index(1):
+                l_obs_stop.append(l_obs[i])
+            elif list_of_res[2][i] == self.walk.index(1):
+                l_obs_walk.append(l_obs[i])
+                if list_of_res[2][i-1] != list_of_res[2][i]:
+                    for n in range(i-obs_to_add, i):
+                        if n > 0:
+                            l_obs_walk.append(l_obs[n])
+                if list_of_res[2][i] != list_of_res[2][i+1]:
+                    for n in range(i, i+obs_to_add):
+                        if n > 0:
+                            l_obs_walk.append(l_obs[n])
 
         return [l_obs_stop, l_obs_walk]
 
@@ -282,11 +310,16 @@ class brain_state_calculate:
             print ('l_obs is empty')
             return 0, []
 
-    def plot_result(self, list_of_res):
+    def plot_result(self, list_of_res, extra_txt):
         plt.figure()
         for i in range(len(list_of_res)):
             plt.plot(list_of_res[i]+i*0.2)
         plt.ylim(-0.2, 3)
+
+        if self.save:
+            plt.savefig('GMM_vs_kohonen' + extra_txt + self.ext_img, bbox_inches='tight')
+        if not self.show:
+            plt.close()
 
     def simulated_annealing(self, l_obs, l_obs_koho, l_res, alpha_start, max_iteration, max_success, verbose=False):
         #inspired from simulated annealing, to determine when we should stop learning

@@ -8,5 +8,6 @@
 *.mat
 *.csv
 *.txt
+*.zip
 
 **/.idea/

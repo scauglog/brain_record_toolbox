@@ -194,9 +194,16 @@ class Kohonen:
 
     def group_neuron_into_x_class(self, class_count):
         self.groups = []
-        list_n = self.good_neurons
-        for n in list_n:
-            self.groups.append(Group_neuron(n, len(self.groups)))
+        if len(self.good_neurons) == 0:
+            print 'good_neurons is empty. all neurons are considered'
+            for c in range(self.col):
+                for r in range(self.row):
+                    n = self.network[c][r]
+                    self.groups.append(Group_neuron(n, len(self.groups)))
+        else:
+            list_n = self.good_neurons
+            for n in list_n:
+                self.groups.append(Group_neuron(n, len(self.groups)))
 
         while len(self.groups) > class_count:
             best_g1 = self.groups[0]

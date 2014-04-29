@@ -64,7 +64,7 @@ class brain_state_calculate:
         #read 'howto file reading' to understand
         if isHealthy:
             #col 4
-            stop = ['1', '-4']
+            stop = ['1', '-4', '0']
             walk = ['2', '-2']
         else:
             #col 6
@@ -163,11 +163,15 @@ class brain_state_calculate:
         l_obs_stop = []
         l_obs_walk = []
         success, list_of_res = self.test(l_obs, l_res, True)
+        #list_of_res
+        #0 = res expected
+        #1 = res calculate before HMM
+        #2 = res calculate after HMM
         for i in range(1, len(l_res)-1):
             if l_res[i] == self.stop:
                 l_obs_stop.append(l_obs[i])
 
-            elif l_res[i] == self.walk and list_of_res[2][i] == self.walk.index(1):
+            elif l_res[i] == self.walk and list_of_res[1][i] == self.walk.index(1):
                 l_obs_walk.append(l_obs[i])
                 self.add_extra_obs(l_obs, l_res, obs_to_add, list_of_res, i, self.walk, l_obs_walk)
 
@@ -198,6 +202,56 @@ class brain_state_calculate:
                             l_obs_walk.append(l_obs[n])
 
         return [l_obs_stop, l_obs_walk]
+
+    def obs_classify_kohonen(self, l_obs):
+        print '###### classify with kohonen ######'
+        while True:
+            #while the network don't give 2 classes
+            n = 0
+            while True:
+                net = kn.Kohonen(20, 20, 32, 5, 0.1, 3, 2, '.png', False, False)
+                for i in range(10):
+                    net.algo_kohonen(l_obs, False)
+
+                #create two group of neurons
+                net.evaluate_neurons(l_obs)
+                net.group_neuron_into_x_class(2)
+                n+=1
+                if len(net.groups) == 2:
+                    break
+                elif n > 4:
+                    raise Exception("error the network can't converge for that number of class")
+                else:
+                    print len(net.groups), len(net.good_neurons)
+
+            #test the networks to know which group is stop and which is walk
+            dict_res = {}
+            for gp in net.groups:
+                dict_res[gp.number] = []
+
+            for obs in l_obs:
+                gp = net.find_best_group(obs)
+                dict_res[gp.number].append(obs)
+
+            #stop have more observation than walk
+            keys = dict_res.keys()
+            print keys
+            if len(keys) == 2:
+                if len(dict_res[keys[0]]) > len(dict_res[keys[1]]):
+                    stop = keys[0]
+                    walk = keys[1]
+                else:
+                    stop = keys[1]
+                    walk = keys[0]
+
+                l_obs_koho = [dict_res[stop], dict_res[walk]]
+                nb_stop = len(dict_res[stop])
+                nb_walk = len(dict_res[walk])
+                print nb_stop, nb_walk, nb_walk/float(nb_stop)
+                if (0.3 < nb_walk/float(nb_stop) < 1.5) or (nb_walk + nb_stop < 150 and nb_walk > 20):
+                    return l_obs_koho
+            else:
+                return [[], []]
 
     def add_extra_obs(self, l_obs, l_res, obs_to_add, list_of_res, i, res_expected, l_obs_state):
         #when the brain state change we add value before or after to the observed state
@@ -302,22 +356,24 @@ class brain_state_calculate:
                 good += 1
             if verbose:
                 print(np.array(res).argmax(), np.array(l_res[i]).argmax(), np.array(prob_res).argmax(), prob_res, prevP)
-        if verbose:
-            print good/float(len(l_obs))
+
         if len(l_obs) > 0:
+            if verbose:
+                print good/float(len(l_obs))
             return good/float(len(l_obs)), [np.array(l_res).argmax(1), np.array(raw_res), np.array(results).argmax(1)]
         else:
             print ('l_obs is empty')
             return 0, []
 
-    def plot_result(self, list_of_res, extra_txt):
+    def plot_result(self, list_of_res, extra_txt=''):
         plt.figure()
         for i in range(len(list_of_res)):
-            plt.plot(list_of_res[i]+i*0.2)
-        plt.ylim(-0.2, 3)
-
+            plt.plot(list_of_res[i]+i*1.2)
+        plt.ylim(-0.2, len(list_of_res)*1.2+0.2)
+        cue_start = np.array(list_of_res[0]).argmax()
+        plt.vlines(cue_start, -0.2, len(list_of_res)*1.2+0.2, 'b', '--')
         if self.save:
-            plt.savefig('GMM_vs_kohonen' + extra_txt + self.ext_img, bbox_inches='tight')
+            plt.savefig('tmp_fig/'+'GMM_vs_kohonen' + extra_txt + self.ext_img, bbox_inches='tight')
         if not self.show:
             plt.close()
 

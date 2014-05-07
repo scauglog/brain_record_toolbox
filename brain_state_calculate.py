@@ -6,9 +6,11 @@ import random as rnd
 import math
 import matplotlib.pyplot as plt
 from itertools import combinations
+import pickle
 
 class brain_state_calculate:
     def __init__(self, chan_count, group_chan, ext_img='.png', save=False, show=False):
+        rnd.seed(42)
         #group channel by
         self.group_chan = group_chan
         #result for the state
@@ -33,6 +35,7 @@ class brain_state_calculate:
         self.alpha = 0.01
         self.koho_row = 6
         self.koho_col = 7
+        self.koho = []
         #number of neighbor to update in the network
         self.neighbor = 3
         #min winning count to be consider as a good neuron
@@ -51,18 +54,71 @@ class brain_state_calculate:
 
     def build_networks(self):
         #build the network
-        koho_stop = kn.Kohonen(self.koho_row, self.koho_col, self.weight_count, self.max_weight, self.alpha, self.neighbor, self.min_win, self.ext_img, self.save, self.show)
-        koho_walk = kn.Kohonen(self.koho_row, self.koho_col, self.weight_count, self.max_weight, self.alpha, self.neighbor, self.min_win, self.ext_img, self.save, self.show)
+        koho_stop = kn.Kohonen(self.koho_row, self.koho_col, self.weight_count, self.max_weight, self.alpha, self.neighbor, self.min_win, self.ext_img, self.save, self.show, rnd.random())
+        koho_walk = kn.Kohonen(self.koho_row, self.koho_col, self.weight_count, self.max_weight, self.alpha, self.neighbor, self.min_win, self.ext_img, self.save, self.show, rnd.random())
         self.koho = [koho_stop, koho_walk]
 
-    def load_networks(self, koho):
-        self.koho = koho
+    def load_networks(self, path):
+        print path
+        pkl_file = open(path, 'rb')
+        self.koho = pickle.load(pkl_file)
+        print len(self.koho)
 
-    def convert_file(self, dir_name, date, files, isHealthy=False,file_core_name='healthyOutput_'):
+    def init_test(self):
+        self.history = np.array([self.stop])
+        #matrix which contain the rank of the result
+        self.prevP = np.array(self.stop)
+        self.HMM=True
+
+    def test_obs(self, obs):
+        dist_res = []
+        best_ns = []
+        res = copy.copy(self.default_res)
+
+        #find the best distance of the obs to each network
+        for k in self.koho:
+            dist_res.append(k.find_mean_best_dist(obs, self.dist_count))
+            #we add extra neurons to best_ns in order to remove null probability
+            best_ns.append(k.find_best_X_neurons(obs, self.dist_count+self.dist_count))
+
+        if self.HMM:
+            #flatten list
+            best_ns = [item for sublist in best_ns for item in sublist]
+
+            prob_res = self.compute_network_accuracy(best_ns, dist_res, obs)
+
+            #compute result with HMM
+            P = []
+            for k in range(prob_res.shape[0]):
+                P.append(self.prevP.T.dot(self.A[:, k])*prob_res[k])
+            #repair sum(P) == 1
+            P = np.array(P).T/sum(P)
+
+            #transform in readable result
+            rank = P.argmax()
+            res[rank] = 1
+
+            #save P.T
+            self.prevP = copy.copy(P.T)
+        else:
+            #transform in readable result
+            rank = np.array(dist_res).argmin()
+            res[rank] = 1
+
+        #use history to smooth change
+        self.history = np.vstack((self.history, res))
+        if self.history.shape[0] > self.history_length:
+            self.history = self.history[1:, :]
+
+        #transform in readable result
+        rank = self.history.mean(0).argmax()
+        return rank
+
+    def convert_file(self, dir_name, date, files, is_healthy=False, file_core_name='healthyOutput_'):
         l_obs = []
         l_res = []
-        #read 'howto file reading' to understand
-        if isHealthy:
+        #read 'howto file reading.txt' to understand
+        if is_healthy:
             #col 4
             stop = ['1', '-4', '0']
             walk = ['2', '-2']
@@ -79,7 +135,7 @@ class brain_state_calculate:
             for row in file:
                 if len(row) > self.first_chan and row[0] != '0':
                     #if rat is healthy walk state are in col 4 otherwise in col 6 see 'howto file reading file'
-                    if isHealthy:
+                    if is_healthy:
                         ratState = row[3]
                     else:
                         ratState = row[5]
@@ -203,7 +259,8 @@ class brain_state_calculate:
 
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_kohonen(self, l_obs):
+    @staticmethod
+    def obs_classify_kohonen(l_obs, acceptance_factor=0.3):
         print '###### classify with kohonen ######'
         while True:
             #while the network don't give 2 classes
@@ -248,12 +305,36 @@ class brain_state_calculate:
                 nb_stop = len(dict_res[stop])
                 nb_walk = len(dict_res[walk])
                 print nb_stop, nb_walk, nb_walk/float(nb_stop)
-                if (0.3 < nb_walk/float(nb_stop) < 1.5) or (nb_walk + nb_stop < 150 and nb_walk > 20):
+                if (acceptance_factor < nb_walk/float(nb_stop) < 1.5) or (nb_walk + nb_stop < 150 and nb_walk > 20):
                     return l_obs_koho
             else:
                 return [[], []]
 
-    def add_extra_obs(self, l_obs, l_res, obs_to_add, list_of_res, i, res_expected, l_obs_state):
+    #TODO handle empty chan_mod with kohonen classify
+    def obs_classify_mod_chan(self, l_obs, l_res, chan_mod):
+        l_obs = np.array(l_obs)
+        #keep only chan that where modulated
+        for c in range(l_obs.shape[1]):
+            if c not in chan_mod:
+                l_obs[:, c] = 0
+
+        success, l_of_res = self.test(l_obs, l_res, True)
+        obs_stop = []
+        obs_walk = []
+        for i in range(l_obs.shape[0]):
+            if l_res[i] == [1, 0]:
+                obs_stop.append(l_obs[i, :])
+            elif l_of_res[1][i] == 1 and l_res[i] == [0, 1]:
+                obs_walk.append(l_obs[i, :])
+        return [obs_stop, obs_walk]
+
+    @staticmethod
+    def get_mod_chan(l_obs):
+        l_obs = np.array(l_obs)
+        return l_obs.sum(0).nonzero()[0]
+
+    @staticmethod
+    def add_extra_obs(l_obs, l_res, obs_to_add, list_of_res, i, res_expected, l_obs_state):
         #when the brain state change we add value before or after to the observed state
         if list_of_res[2][i-1] != list_of_res[2][i]:
             for n in range(i-obs_to_add, i):
@@ -380,7 +461,7 @@ class brain_state_calculate:
     def simulated_annealing(self, l_obs, l_obs_koho, l_res, alpha_start, max_iteration, max_success, verbose=False):
         #inspired from simulated annealing, to determine when we should stop learning
         #initialize
-        success, lor = self.test(l_obs, l_res)
+        success, lor_trash = self.test(l_obs, l_res)
         success -= 0.1
         alpha = alpha_start
         n = 0
@@ -396,7 +477,7 @@ class brain_state_calculate:
                 else:
                     koho_cp[i].algo_kohonen(l_obs_koho[i])
             #compute success of the networks
-            success_cp, lor = self.test(l_obs, l_res)
+            success_cp, lor_trash = self.test(l_obs, l_res)
 
             if verbose:
                 print '---'
@@ -419,10 +500,106 @@ class brain_state_calculate:
             #alpha *= Lambda
             n += 1
 
-    def random_combination(self, iterable, r):
+    @staticmethod
+    def random_combination(iterable, r):
         #"Random selection from itertools.combinations(iterable, r)"
         pool = tuple(iterable)
         n = len(pool)
         indices = sorted(rnd.sample(xrange(n), r))
         return tuple(pool[i] for i in indices)
 
+    def save_networks(self, dir_name, date):
+        #save networks
+        with open(dir_name + 'koho_networks_' + date, 'wb') as my_file:
+            my_pickler = pickle.Pickler(my_file)
+            my_pickler.dump(self.koho)
+
+    #classify the given result
+    @staticmethod
+    def class_result(l_res, l_expected_res):
+        block_length = 0.1
+        long_walk = 2/block_length
+        short_walk = 2
+        long_walk_count = 0
+        short_walk_count = 0
+        longest_walk = 0
+        current_walk = 0
+        current_stop = 0
+        #give the percentage of walk before cue
+        walk_before_cue_count = 0
+        total_walk = 0
+        walk_after_cue_count = 0
+        walk_expected = 0
+
+        for i in range(len(l_res)):
+            if l_expected_res[i] == 1:
+                walk_expected += 1
+                if l_res[i] == 1:
+                    walk_after_cue_count += 1
+
+            if l_res[i] == 1 and l_expected_res[i] == 0:
+                walk_before_cue_count += 1
+
+            if l_expected_res[i-1] == 0 and l_expected_res[i] == 1:
+                walk_before_cue_count /= float(i)
+
+            if l_res[i] != l_res[i-1]:
+                if current_walk > longest_walk:
+                    longest_walk = current_walk
+                if current_walk > long_walk:
+                    long_walk_count += 1
+                if 0 < current_walk < short_walk:
+                    short_walk_count += 1
+                if current_walk > 0:
+                    total_walk += current_walk
+                current_walk = 0
+                current_stop = 0
+            else:
+                if l_res[i] == 0:
+                    current_stop += 1
+                else:
+                    current_walk += 1
+        walk_after_cue_count /= float(walk_expected)
+        training = []
+        #perfect trial no walk before cue and at least 2 second of walk
+        if walk_before_cue_count == 0 and total_walk > 2/block_length and long_walk_count > 0:
+            training.append("train_prev_res")
+        #collapse only walk or only rest
+        if total_walk > len(l_res)-2 or total_walk < 2:
+            training.append("train_kohonen")
+        #to many walk before cue
+        if walk_before_cue_count > 0.0:
+            training.append("train_stop")
+        #not enough walk after cue
+        if walk_after_cue_count < 0.2:
+            training.append("train_walk")
+        #to many short walk
+        if short_walk_count > 7:
+            training.append("train_mixed_res")
+        return training
+
+
+#rules
+# if we have too many walk before cue -> train only stop, make walk away
+# if we have not enough walk during cue -> add extra result to walk and train with mixed_res
+#                                       -> new network
+# if we have too many short walk
+# if we have perfect Trial train with good or don't touch network
+# if we have nearly perfect trial train on mistake
+# if collapse -> kohonen learning
+# if only walk -> train stop
+# if only rest -> train walk
+
+# when new day migrate all the network
+#give percentage of confidence for both state
+#loop until we have a success trial
+#use random seed
+
+#rebuild network
+#migrate network use neighbor length of network and algo koho with no decrease neighbor
+#koho[].neighbor=max([self.koho_col,self.koho_row])
+#10 times do -> koho[].algo_kohonen(l_obs,False)
+#train with all file in
+#train with this file
+
+#when test only use chan previously modulate set other to 0

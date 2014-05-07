@@ -6,7 +6,8 @@ import copy
 
 
 class Neurone:
-    def __init__(self, weight_count, max_rnd, col=-1, row=-1):
+    def __init__(self, weight_count, max_rnd, col=-1, row=-1, seed=42):
+        rnd.seed(seed)
         self.weights = []
         self.weight_count = weight_count
         self.col = col
@@ -38,7 +39,7 @@ class Neurone:
 
 
 class Kohonen:
-    def __init__(self, row, col, weight_count, max_weight, alpha, neighbor, min_win, ext_img, save, show):
+    def __init__(self, row, col, weight_count, max_weight, alpha, neighbor, min_win, ext_img, save, show, seed=42):
         self.row = row
         self.col = col
         self.neighbor = neighbor
@@ -50,10 +51,11 @@ class Kohonen:
         self.img_ext = ext_img
         self.save = save
         self.show = show
+        rnd.seed(seed)
         for c in range(self.col):
             self.network.append([])
             for r in range(self.row):
-                self.network[c].append(Neurone(weight_count, max_weight, c, r))
+                self.network[c].append(Neurone(weight_count, max_weight, c, r, rnd.random()))
 
     def algo_kohonen(self, obs_list, neighbor_decrease=True):
         for obs in obs_list:
@@ -198,12 +200,12 @@ class Kohonen:
             print 'good_neurons is empty. all neurons are considered'
             for c in range(self.col):
                 for r in range(self.row):
-                    n = self.network[c][r]
+                    n = copy.copy(self.network[c][r])
                     self.groups.append(Group_neuron(n, len(self.groups)))
         else:
             list_n = self.good_neurons
             for n in list_n:
-                self.groups.append(Group_neuron(n, len(self.groups)))
+                self.groups.append(Group_neuron(copy.copy(n), len(self.groups)))
 
         while len(self.groups) > class_count:
             best_g1 = self.groups[0]

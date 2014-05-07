@@ -44,6 +44,7 @@ group_chan_by = 1
 my_bsc = bsc.brain_state_calculate(number_of_chan, group_chan_by)
 #number of chan after grouping
 number_of_chan /=group_chan_by
+f = open('chan_evo_result.txt', 'w')
 
 n = 0
 all_chan_means = {}
@@ -79,7 +80,6 @@ for rat in files.keys():
         plt.savefig('tmp_fig/chan_evol_'+str(n) +'.png', bbox_inches='tight')
         plt.close()
         n += 1
-
     for d in range(1, all_chan_means[rat].shape[0]):
         new_neuron = 0
         lost_neuron = 0
@@ -99,6 +99,7 @@ for rat in files.keys():
         all_new_neuron[rat].append(new_neuron/(number_of_chan/100))
         all_lost_neuron[rat].append(lost_neuron/(number_of_chan/100))
         all_mod_neuron[rat].append(mod_neuron/(number_of_chan/100))
+
     print all_chan_means[rat].shape[0], Counter(all_chan_mod_count[rat])
     tmp = Counter(all_chan_mod_count[rat])
     for k in tmp.keys():
@@ -122,12 +123,30 @@ plt.boxplot([boxplot_new_neuron, boxplot_lost_neuron, boxplot_mod_neuron])
 plt.xticks([1, 2, 3], ['new', 'lost', 'modulate'])
 plt.ylabel('% of neuron')
 plt.savefig('tmp_fig/neuron_evo_boxplot.png')
-
+f.write('\n mean new: ')
+f.write(str(np.array(boxplot_new_neuron).mean()))
+f.write('\n std new: ')
+f.write(str(np.array(boxplot_new_neuron).std()))
+f.write('\n mean lost: ')
+f.write(str(np.array(boxplot_lost_neuron).mean()))
+f.write('\n std lost: ')
+f.write(str(np.array(boxplot_lost_neuron).std()))
+f.write('\n mean mod: ')
+f.write(str(np.array(boxplot_mod_neuron).mean()))
+f.write('\n std mod: ')
+f.write(str(np.array(boxplot_mod_neuron).std()))
 plt.close()
-plt.boxplot(all_chan_mod)
+
+all_chan_mod=np.array(all_chan_mod)
+plt.boxplot(all_chan_mod[all_chan_mod != 0])
 plt.xticks([1], ['mean fire modulation between day'])
 plt.savefig('tmp_fig/neuron_mod_over_d_boxplot.png')
 plt.close()
+
+f.write('\nmean var: ')
+f.write(str(all_chan_mod[all_chan_mod != 0].mean()))
+f.write('\nstds var: ')
+f.write(str(all_chan_mod[all_chan_mod != 0].std()))
 
 bins = np.linspace(0, 100, 6)
 hist, bins = np.histogram(perc_modulation, bins)
@@ -140,6 +159,7 @@ plt.savefig('tmp_fig/modulation_hist.png')
 plt.close()
 #number of lost neurons between day
 #number of new neurons
+f.close()
 print('###############')
 print('####  END  ####')
 

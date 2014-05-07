@@ -1,9 +1,6 @@
 import matplotlib.pyplot as plt
 import brain_state_calculate as bsc
 import numpy as np
-import kohonen_neuron as kn
-from collections import Counter
-import signal_processing
 
 #In this script we train the kohonen network using another kohonen network
 #learning is totally unsupervised
@@ -26,56 +23,7 @@ l_res, l_obs = my_bsc.convert_file(dir_name, 't_0423', files0423[0:5], False)
 #use training dataset (not working)
 # sp = signal_processing.Signal_processing()
 # l_obs = sp.load_m(dir_name+'trainSet140423.mat', 'BrainAct')
-
-net = kn.Kohonen(20, 20, 32, 5, 0.1, 3, 2, '.png', False, False)
-for i in range(10):
-    net.algo_kohonen(l_obs, False)
-
-#create two group of neurons
-net.evaluate_neurons(l_obs)
-net.group_neuron_into_x_class(2)
-
-#test the networks to know which group is stop and which is walk
-l_res_trash, l_obs = my_bsc.convert_file(dir_name, 't_0423', files0423[5:6], False)
-kn_res = []
-for obs in l_obs:
-    gp = net.find_best_group(obs)
-    kn_res.append(gp.number)
-
-#stop have more observation than walk
-ct = Counter(kn_res)
-keys = ct.keys()
-print keys
-if ct[keys[0]] > ct[keys[1]]:
-    stop = keys[0]
-    walk = keys[1]
-else:
-    stop = keys[1]
-    walk = keys[0]
-
-#some visual feedback of the network
-if show:
-    plt.plot(kn_res)
-    plt.plot(np.array(l_res).argmax(1))
-    plt.show()
-
-##we train two network using result given by the previous network
-#first classify obs using the koho network
-l_res, l_obs = my_bsc.convert_file(dir_name, 't_0423', files0423[0:5], False)
-kn_res = []
-for obs in l_obs:
-    gp = net.find_best_group(obs)
-    kn_res.append(gp.number)
-
-obs_stop = []
-obs_walk = []
-for i in range(len(kn_res)):
-    if kn_res[i] == stop:
-        obs_stop.append(l_obs[i])
-    else:
-        obs_walk.append(l_obs[i])
-
-l_obs_koho = [obs_stop, obs_walk]
+l_obs_koho = my_bsc.obs_classify_kohonen(l_obs, 0.0)
 
 #build and train networks
 my_bsc.build_networks()

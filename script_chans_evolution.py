@@ -66,7 +66,7 @@ for rat in files.keys():
     for date in files[rat].keys():
         file_date = '12'+date
         dir_name = base_dir+'Dec'+date+'/'+rat+'/'
-        l_res, tmp_obs = my_bsc.convert_file(dir_name, file_date, files[rat][date], False, 'SCIOutput_')
+        l_res, tmp_obs = my_bsc.convert_cpp_file(dir_name, file_date, files[rat][date], False, 'SCIOutput_')
         l_obs = np.array(tmp_obs)
         all_chan_means[rat].append(l_obs.mean(0))
         all_chan_stds[rat].append(l_obs.std(0))

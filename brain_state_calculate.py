@@ -33,7 +33,7 @@ class brain_state_calculate:
 
         #koho parameters
         self.alpha = 0.01
-        self.koho_row = 6
+        self.koho_row = 1
         self.koho_col = 7
         self.koho = []
         #number of neighbor to update in the network
@@ -41,7 +41,7 @@ class brain_state_calculate:
         #min winning count to be consider as a good neuron
         self.min_win = 7
         #number of best neurons to keep for calculate distance of obs to the network
-        self.dist_count = 5
+        self.dist_count = 3
         self.max_weight = 5
         self.weight_count = self.chan_count/self.group_chan
 
@@ -51,6 +51,9 @@ class brain_state_calculate:
         #change alpha by a factor of
         #/!\ should be float
         self.change_alpha_factor = 10.0
+
+        #not a successfull trial
+        self.was_bad = 0
 
     def build_networks(self):
         #build the network
@@ -65,12 +68,14 @@ class brain_state_calculate:
         print len(self.koho)
 
     def init_test(self):
+        #initilise test for live processing
         self.history = np.array([self.stop])
         #matrix which contain the rank of the result
         self.prevP = np.array(self.stop)
         self.HMM=True
 
     def test_obs(self, obs):
+        #test one obs
         dist_res = []
         best_ns = []
         res = copy.copy(self.default_res)
@@ -114,14 +119,15 @@ class brain_state_calculate:
         rank = self.history.mean(0).argmax()
         return rank
 
-    def convert_file(self, dir_name, date, files, is_healthy=False, file_core_name='healthyOutput_'):
+    def convert_cpp_file(self, dir_name, date, files, is_healthy=False, file_core_name='healthyOutput_', cut_after_cue=True):
+        #convert cpp file to list of obs and list of res
         l_obs = []
         l_res = []
         #read 'howto file reading.txt' to understand
         if is_healthy:
             #col 4
-            stop = ['1', '-4', '0']
-            walk = ['2', '-2']
+            stop = ['1', '-4', '0', '-2']
+            walk = ['2']
         else:
             #col 6
             stop = ['0', '3', '4']
@@ -131,6 +137,7 @@ class brain_state_calculate:
             filename = dir_name+date+file_core_name+str(f)+'.txt'
             csvfile = open(filename, 'rb')
             file = csv.reader(csvfile, delimiter=' ', quotechar='"')
+            prevState=stop[0]
             #grab expected result in file and convert, grab input data
             for row in file:
                 if len(row) > self.first_chan and row[0] != '0':
@@ -144,12 +151,19 @@ class brain_state_calculate:
                     brain_state = self.convert_brain_state(row[self.first_chan:self.chan_count+self.first_chan])
                     #'-1' added to ignore time where the rat is in the air added by 'add_ground_truth'
                     if row[5] != '-1':
+                        if row[5] in ['0', '3', '4']and prevState in walk and cut_after_cue:
+                                break
+
                         if ratState in stop:
+                            #we don't take after the cue cause the rat reach the target
                             l_res.append(self.stop)
                             l_obs.append(brain_state)
                         elif ratState in walk:
                             l_res.append(self.walk)
                             l_obs.append(brain_state)
+
+                        if row[5] in ['1', '2']:
+                            prevState = walk[0]
 
             # derivative of l_obs
             # l_obs_d = []
@@ -173,6 +187,7 @@ class brain_state_calculate:
         return obs_converted
 
     def obs_classify(self, l_obs, l_res):
+        #classify obs using the cue
         l_obs_stop = []
         l_obs_walk = []
         for i in range(len(l_res)):
@@ -182,7 +197,7 @@ class brain_state_calculate:
                 l_obs_walk.append(l_obs[i])
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_good_res(self, l_obs, l_res, obs_to_add):
+    def obs_classify_good_res(self, l_obs, l_res, obs_to_add=0):
         #add obs only if the network give the good answer
         l_obs_stop = []
         l_obs_walk = []
@@ -199,7 +214,7 @@ class brain_state_calculate:
 
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_bad_res(self, l_obs, l_res, obs_to_add):
+    def obs_classify_bad_res(self, l_obs, l_res, obs_to_add=0):
         #add obs only if the network give the bad answer
         l_obs_stop = []
         l_obs_walk = []
@@ -214,7 +229,7 @@ class brain_state_calculate:
 
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_mixed_res(self, l_obs, l_res, obs_to_add):
+    def obs_classify_mixed_res(self, l_obs, l_res, obs_to_add=0):
         #add obs to stop when no cue and to walk only if the network give the right answer
         l_obs_stop = []
         l_obs_walk = []
@@ -227,13 +242,13 @@ class brain_state_calculate:
             if l_res[i] == self.stop:
                 l_obs_stop.append(l_obs[i])
 
-            elif l_res[i] == self.walk and list_of_res[1][i] == self.walk.index(1):
+            elif l_res[i] == self.walk and list_of_res[2][i] == self.walk.index(1):
                 l_obs_walk.append(l_obs[i])
                 self.add_extra_obs(l_obs, l_res, obs_to_add, list_of_res, i, self.walk, l_obs_walk)
 
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_prev_res(self, l_obs, l_res, obs_to_add):
+    def obs_classify_prev_res(self, l_obs, l_res, obs_to_add=0):
         #we class obs using only the previous result no ground truth involved here
         #we need ground truth to call test
         l_obs_stop = []
@@ -259,14 +274,14 @@ class brain_state_calculate:
 
         return [l_obs_stop, l_obs_walk]
 
-    @staticmethod
-    def obs_classify_kohonen(l_obs, acceptance_factor=0.3):
+    def obs_classify_kohonen(self, l_obs, acceptance_factor=0.0):
         print '###### classify with kohonen ######'
         while True:
             #while the network don't give 2 classes
             n = 0
             while True:
-                net = kn.Kohonen(20, 20, 32, 5, 0.1, 3, 2, '.png', False, False)
+                net = kn.Kohonen(12, 7, 32, 5, 0.1, 3, 2, self.ext_img, False, False)
+
                 for i in range(10):
                     net.algo_kohonen(l_obs, False)
 
@@ -305,48 +320,59 @@ class brain_state_calculate:
                 nb_stop = len(dict_res[stop])
                 nb_walk = len(dict_res[walk])
                 print nb_stop, nb_walk, nb_walk/float(nb_stop)
-                if (acceptance_factor < nb_walk/float(nb_stop) < 1.5) or (nb_walk + nb_stop < 150 and nb_walk > 20):
+                if acceptance_factor > 0 and (acceptance_factor < nb_walk/float(nb_stop) < 1.5) or (nb_walk + nb_stop < 150 and nb_walk > 20):
+                    return l_obs_koho
+                elif acceptance_factor == 0:
                     return l_obs_koho
             else:
                 return [[], []]
 
-    #TODO handle empty chan_mod with kohonen classify
-    def obs_classify_mod_chan(self, l_obs, l_res, chan_mod):
-        l_obs = np.array(l_obs)
-        #keep only chan that where modulated
-        for c in range(l_obs.shape[1]):
-            if c not in chan_mod:
-                l_obs[:, c] = 0
+    def obs_classify_mod_chan(self, l_obs, l_res, chan_mod, obs_to_add=0):
+        #test the net with only the chan that where modulated before
+        #then classify using mixed res
+        if len(chan_mod) == 0:
+            return self.obs_classify_kohonen(l_obs)
 
-        success, l_of_res = self.test(l_obs, l_res, True)
+        l_obs = np.array(l_obs)
+        l_obs_mod = copy.copy(np.array(l_obs))
+        #keep only chan that where modulated
+        for c in range(l_obs_mod.shape[1]):
+            if c not in chan_mod:
+                l_obs_mod[:, c] = 0
+
+        success, l_of_res = self.test(l_obs_mod, l_res, True)
         obs_stop = []
         obs_walk = []
         for i in range(l_obs.shape[0]):
             if l_res[i] == [1, 0]:
                 obs_stop.append(l_obs[i, :])
-            elif l_of_res[1][i] == 1 and l_res[i] == [0, 1]:
+            elif l_of_res[2][i] == 1 and l_res[i] == [0, 1]:
                 obs_walk.append(l_obs[i, :])
+                self.add_extra_obs(l_obs, l_res, obs_to_add, l_of_res, i, self.walk, obs_walk)
         return [obs_stop, obs_walk]
 
     @staticmethod
     def get_mod_chan(l_obs):
+        #return the chan where a neuron is active (modulated chan)
         l_obs = np.array(l_obs)
         return l_obs.sum(0).nonzero()[0]
 
     @staticmethod
     def add_extra_obs(l_obs, l_res, obs_to_add, list_of_res, i, res_expected, l_obs_state):
         #when the brain state change we add value before or after to the observed state
-        if list_of_res[2][i-1] != list_of_res[2][i]:
-            for n in range(i-obs_to_add, i):
-                if 0 < n < len(l_res) and l_res[n] == res_expected:
-                    l_obs_state.append(l_obs[n])
-        elif list_of_res[2][i+1] != list_of_res[2][i]:
-            for n in range(i, i+obs_to_add):
-                if 0 < n < len(l_res) and l_res[n] == res_expected:
-                    l_obs_state.append(l_obs[n])
+        if 1 < i < len(l_res)-1:
+            if list_of_res[2][i-1] != list_of_res[2][i]:
+                for n in range(i-obs_to_add, i):
+                    if 0 < n < len(l_res) and l_res[n] == res_expected:
+                        l_obs_state.append(l_obs[n])
+            elif list_of_res[2][i+1] != list_of_res[2][i]:
+                for n in range(i, i+obs_to_add):
+                    if 0 < n < len(l_res) and l_res[n] == res_expected:
+                        l_obs_state.append(l_obs[n])
 
     def compute_network_accuracy(self, best_ns, dist_res, obs):
         #we test combination of each best n
+        #return an array of probability (prob of the obs to be state X)
         dist_comb = []
         if self.test_all:
             #test all combinations
@@ -376,6 +402,33 @@ class brain_state_calculate:
 
         return np.array(prob_res)
 
+    def compute_network_accuracy_p(self, best_ns, obs):
+        #return an array of probability (prob of the obs to be state X)
+        #prob is computed using the class of the nearest neighbor of the obs
+        #store all distance
+        dist_all = []
+        #store all distance to a specific network
+        dist_net = []
+        #find the distance between the obs and each nearest neighbor
+        for k in best_ns:
+            tmp_l = []
+            for n in k:
+                dst = n.calc_error(obs)
+                dist_all.append(dst)
+                tmp_l.append(dst)
+
+            dist_net.append(tmp_l)
+        dist_all.sort()
+        prob_res = []
+        #for each state (network)
+        for net in dist_net:
+            count = 0
+            for i in range(self.dist_count):
+                if dist_all[i] in net:
+                    count += 1
+            prob_res.append(count/float(self.dist_count))
+        return np.array(prob_res)
+
     def test(self, l_obs, l_res, HMM=False, verbose=False):
         good = 0
 
@@ -403,6 +456,7 @@ class brain_state_calculate:
                 best_ns = [item for sublist in best_ns for item in sublist]
 
                 prob_res = self.compute_network_accuracy(best_ns, dist_res, l_obs[i])
+                #prob_res = self.compute_network_accuracy_p(best_ns, l_obs[i])
 
                 #compute result with HMM
                 P = []
@@ -448,13 +502,16 @@ class brain_state_calculate:
 
     def plot_result(self, list_of_res, extra_txt=''):
         plt.figure()
+        plt.ylim(-0.2, len(list_of_res)*1.2+0.2)
+        for i in range(len(list_of_res[0])):
+            if list_of_res[0][i-1] != list_of_res[0][i]:
+                plt.vlines(i, -0.2, len(list_of_res)*1.2+0.2, 'b', '--')
         for i in range(len(list_of_res)):
             plt.plot(list_of_res[i]+i*1.2)
-        plt.ylim(-0.2, len(list_of_res)*1.2+0.2)
-        cue_start = np.array(list_of_res[0]).argmax()
-        plt.vlines(cue_start, -0.2, len(list_of_res)*1.2+0.2, 'b', '--')
+
         if self.save:
             plt.savefig('tmp_fig/'+'GMM_vs_kohonen' + extra_txt + self.ext_img, bbox_inches='tight')
+            plt.savefig('tmp_fig/'+'GMM_vs_kohonen' + extra_txt + '.eps', bbox_inches='tight')
         if not self.show:
             plt.close()
 
@@ -476,6 +533,12 @@ class brain_state_calculate:
                     koho_cp[i].algo_kohonen(l_obs_koho[i], False)
                 else:
                     koho_cp[i].algo_kohonen(l_obs_koho[i])
+            #we train walk multiple time to have same training has rest
+            cpt = 0
+            if len(l_obs_koho[1]) > 0:
+                while cpt < len(l_obs_koho[0]):
+                    koho_cp[1].algo_kohonen(l_obs_koho[1])
+                    cpt += len(l_obs_koho[1])
             #compute success of the networks
             success_cp, lor_trash = self.test(l_obs, l_res)
 

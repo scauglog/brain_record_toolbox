@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 dir_name = '../data/r415/'
 
-img_ext = '.png'
+img_ext = '.eps'
 save_img = True
 show = False
 save_obj = False
@@ -49,6 +49,7 @@ with open(dir_name + 'templates', 'rb') as my_file:
 sp = sig_proc.Signal_processing(save_img, show, img_ext)
 
 global_snr = []
+global_cell_count=[]
 for record in record_name:
 # record = record_name[0]
     print('----- processing record: ' + record + ' -----')
@@ -58,6 +59,7 @@ for record in record_name:
     fsignal = sp.signal_mc_filtering(signal, low_cut, high_cut, fs)
 
     signal_noise_ratio_r415 = []
+    cell_count=0
     for chan in range(fsignal.shape[0]):
         print('\n\n--- processing chan : ' + str(chan + 1) + ' ---')
         s = fsignal[chan]
@@ -78,14 +80,15 @@ for record in record_name:
         #keep best cluster aka groups
         min_clus = max(min_clus_abs, min_clus_rel * spikes_values.shape[0])
         koho.evaluate_group(spikes_values, 2 * dist_thresh, min_clus)#keep only groups that have more spike than min_clus
-
+        cell_count += len(koho.groups)
         for group in koho.groups:
-            if np.array(group.spikes).shape[0]>0:
+            if np.array(group.spikes).shape[0] > 0:
                 max_spike = np.array(group.spikes).max(1).mean()
                 min_spike = np.array(group.spikes).min(1).mean()
                 signal_noise_ratio_r415.append((max_spike-min_spike)/(max_sig-min_sig))
             else:
                 signal_noise_ratio_r415.append(0)
+    global_cell_count.append(cell_count)
     global_snr.append(copy.copy(signal_noise_ratio_r415))
 
 box_plot=[]
@@ -99,9 +102,19 @@ snr_mean = []
 for l in global_snr:
     snr_mean.append(np.array(l).mean())
 plt.plot(snr_mean)
-
 if save_img:
     plt.savefig('box_plot_snr_r415_new'+img_ext, bbox_inches='tight')
+if show:
+    plt.show()
+else:
+    plt.close()
+
+plt.figure()
+plt.plot(global_cell_count)
+plt.hlines(32, 0, len(record_name))
+plt.hlines(64, 0, len(record_name))
+if save_img:
+    plt.savefig('neuron_evo_r415_new'+img_ext, bbox_inches='tight')
 if show:
     plt.show()
 else:

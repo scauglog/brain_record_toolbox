@@ -59,18 +59,23 @@ class Kohonen:
 
     def algo_kohonen(self, obs_list, neighbor_decrease=True):
         for obs in obs_list:
-            best_n = self.find_best_neuron(obs)
-            best_c = best_n.col
-            best_r = best_n.row
+            self.update_closest_neurons(obs, neighbor_decrease)
 
-            #update closest neurons weights and also weight of his neighbor
-            for c in range(best_c - self.neighbor, best_c + self.neighbor):
-                for r in range(best_r - self.neighbor, best_r + self.neighbor):
-                    if 0 <= c < self.col and 0 <= r < self.row:
-                        if neighbor_decrease:
-                            dist = 1.0 + abs(best_c - c) + abs(best_r - r)
-                        else:
-                            dist = 1.0
+    def update_closest_neurons(self, obs, neighbor_decrease=True, push_away=False):
+        best_n = self.find_best_neuron(obs)
+        best_c = best_n.col
+        best_r = best_n.row
+        #update closest neurons weights and also weight of his neighbor
+        for c in range(best_c - self.neighbor, best_c + self.neighbor):
+            for r in range(best_r - self.neighbor, best_r + self.neighbor):
+                if 0 <= c < self.col and 0 <= r < self.row:
+                    if neighbor_decrease:
+                        dist = 1.0 + abs(best_c - c) + abs(best_r - r)
+                    else:
+                        dist = 1.0
+                    if push_away:
+                        self.network[c][r].change_weights(dist, obs, -self.alpha)
+                    else:
                         self.network[c][r].change_weights(dist, obs, self.alpha)
 
     #count the number of time each neurons win
@@ -288,6 +293,49 @@ class Kohonen:
         if not self.show:
             plt.close()
 
+    def plot_network_array(self, extra_text=''):
+        plt.figure()
+        cpt=1
+        for c in range(self.col):
+            for r in range(self.row):
+                w = self.network[c][r].weights
+                plt.subplot(self.col, self.row, cpt)
+                plt.plot(range(len(w)), w)
+                cpt += 1
+        if self.save:
+            plt.savefig('all_neurons_weights_a' + extra_text + self.img_ext, bbox_inches='tight')
+        if not self.show:
+            plt.close()
+
+    def plot_network_dist(self, extra_text=''):
+        plt.figure()
+        net_dst = []
+        for c in range(self.col):
+            net_dst.append([])
+            for r in range(self.row):
+                dst = 0
+                cpt = 0
+                if 0 <= c-1 < self.col:
+                    dst += self.network[c][r].interneuron_dist(self.network[c-1][r])
+                    cpt += 1
+                if 0 <= c+1 < self.col:
+                    dst += self.network[c][r].interneuron_dist(self.network[c+1][r])
+                    cpt += 1
+                if 0 <= r-1 < self.row:
+                    dst += self.network[c][r].interneuron_dist(self.network[c][r+1])
+                    cpt += 1
+                if 0 <= r+1 < self.row:
+                    dst += self.network[c][r].interneuron_dist(self.network[c][r-1])
+                    cpt += 1
+                net_dst[c].append(dst/float(cpt))
+
+        plt.imshow(net_dst, interpolation='none')
+        plt.colorbar()
+        if self.save:
+            plt.savefig('network_dst_map' + extra_text + self.img_ext, bbox_inches='tight')
+        if not self.show:
+            plt.close()
+
     #same as plot_network (above) but only for the best neurons (win count > threshold)
     def plot_best_neurons(self, extra_text=''):
         plt.figure()
@@ -412,7 +460,10 @@ class Group_neuron:
         for n in self.neurons:
             sum_template += np.array(n.weights) * n.win_count
             count += n.win_count
-        self.template = sum_template / count
+        if count > 0:
+            self.template = sum_template / count
+        else:
+            self.template *= 0
 
     def dist(self, val):
         dist = 0

@@ -121,7 +121,7 @@ success, l_of_res = my_bsc.test(l_obs, l_res)
 #add gmm result to the plot (use test for healthy data)
 #l_res_gmm, l_obs_trash = my_bsc.convert_file(dir_name, 't_0423', files[first_train-1:first_train], True)
 l_res_gnd_truth, l_obs_trash = my_bsc.convert_cpp_file(dir_name, 't_0423', files[first_train-1:first_train], False,cut_after_cue=False)
-l_of_res.append(np.array(l_res_gnd_truth).argmax(1))
+l_of_res['real_gnd_truth']=np.array(l_res_gnd_truth).argmax(1)
 my_bsc.plot_result(l_of_res, '_file_'+str(files[first_train-1:first_train])+'_')
 
 #test all the trial and train the network between each trial
@@ -155,15 +155,15 @@ for i in range(first_train, len(files)):
     success, l_of_res = my_bsc.test(l_obs, l_res)
     #l_res_gmm, l_obs_trash = my_bsc.convert_file(dir_name, 't_0423', files[i:i+1], True)
     l_res_gnd_truth, l_obs_trash = my_bsc.convert_cpp_file(dir_name, 't_0423', files[i:i+1], False,cut_after_cue=False)
-    #l_of_res.append(np.array(l_res_gmm).argmax(1))
-    #l_of_res.append((np.array(l_of_res[2])+np.array(l_of_res[3])) > 1)
-    l_of_res.append(np.array(l_res_gnd_truth).argmax(1))
+    #l_of_res['GMM'](np.array(l_res_gmm).argmax(1))
+    #l_of_res['GMM&koho']((np.array(l_of_res[my_bsc.name])+np.array(l_of_res['GMM'])) > 1)
+    l_of_res['real_gnd_truth']=np.array(l_res_gnd_truth).argmax(1)
     print success
     sr_dict['r600'][str(len(chg_obs))]['l_of_res'].append(l_of_res)
     my_bsc.plot_result(l_of_res, '_file_'+str(len(chg_obs))+'_'+str(files[i:i+1]))
 
     my_bsc.train_nets(l_obs, l_res, with_RL=False)
-    sr_dict['r600'][str(len(chg_obs))]['koho_RL'].append(my_bsc.success_rate(l_of_res[2], l_of_res[-1]))
+    sr_dict['r600'][str(len(chg_obs))]['koho_RL'].append(my_bsc.success_rate(l_of_res[my_bsc.name], l_of_res['real_gnd_truth']))
     my_bsc.get_mod_chan(l_obs)
 
 

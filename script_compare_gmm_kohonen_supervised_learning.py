@@ -21,7 +21,7 @@ my_bsc.simulated_annealing(l_obs, l_obs_koho, l_res, 0.10, 14, 0.95, True)
 l_res, l_obs = my_bsc.convert_cpp_file(dir_name, 't_0423', files0423[5:6], False)
 success, l_of_res = my_bsc.test(l_obs, l_res, True)
 l_res_gmm, l_obs_trash = my_bsc.convert_cpp_file(dir_name, 't_0423', files0423[5:6], True)
-l_of_res.append(np.array(l_res_gmm).argmax(1))
+l_of_res['GMM']=np.array(l_res_gmm).argmax(1)
 my_bsc.plot_result(l_of_res, '_file_'+str(files0423[5:6])+'_')
 print '--------- end ---------'
 
@@ -43,9 +43,9 @@ for i in range(5, len(files0423)):
     l_res, l_obs = my_bsc.convert_cpp_file(dir_name, 't_0423', files0423[i:i+1], False)
     success, l_of_res = my_bsc.test(l_obs, l_res, True)
     l_res_gmm, l_obs_trash = my_bsc.convert_cpp_file(dir_name, 't_0423', files0423[i:i+1], True)
-    l_of_res.append(np.array(l_res_gmm).argmax(1))
+    l_of_res['GMM'] = np.array(l_res_gmm).argmax(1)
     print success
-    l_of_res.append((np.array(l_of_res[2])+np.array(l_of_res[3])) > 1)
+    l_of_res['GMM&koho'] = np.array(l_of_res[my_bsc.name])+np.array(l_of_res['GMM']) > 1
     my_bsc.plot_result(l_of_res, 'file_'+str(files0423[i:i+1])+'_')
 
 print '--------- end Train SCI ---------'

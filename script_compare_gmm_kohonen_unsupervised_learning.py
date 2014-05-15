@@ -43,18 +43,18 @@ for i in range(5, len(files0423)):
     success, l_of_res = my_bsc.test(l_obs, l_res)
     success2, l_of_res2 = my_bsc2.test(l_obs, l_res)
     l_res_gmm, l_obs_trash = my_bsc.convert_cpp_file(dir_name, 't_0423', files0423[i-1:i], True, cut_after_cue=False, init_in_walk=True)
-    l_of_res.append(l_of_res2[1])
-    l_of_res.append(l_of_res2[2])
-    l_of_res.append(np.array(l_res_gmm).argmax(1))
+    l_of_res.update(l_of_res2)
+    l_of_res['GMM']=np.array(l_res_gmm).argmax(1)
     print success, success2
     results_koho_retrained.append(success)
     results_koho.append(success2)
     my_bsc.plot_result(l_of_res, '_koho_unsupervised'+str(files0423[i:i+1])+'_')
-    good=0
-    for i in range(l_of_res[0].shape[0]):
-        if l_of_res[0][i] == l_of_res[3][i]:
+    good = 0
+    #calculate GMM success rate
+    for i in range(l_of_res['gnd_truth'].shape[0]):
+        if l_of_res['gnd_truth'][i] == l_of_res['GMM'][i]:
             good += 1
-    results_GMM.append(good/float(l_of_res[0].shape[0]))
+    results_GMM.append(good/float(l_of_res['gnd_truth'].shape[0]))
     #train networks using previous result
     l_obs_koho = my_bsc.obs_classify_prev_res(l_obs, -3)
     my_bsc.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99, over_train_walk=True)

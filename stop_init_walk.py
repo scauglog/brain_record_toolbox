@@ -26,7 +26,7 @@ files1203 = [25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
 
 ##### 0442_r600
 #files0422 = [2,3,4,5,6,7,8]
-my_bsc = bsc.brain_state_calculate(128, 4)
+my_bsc = bsc.brain_state_calculate(128, 4, 'koho')
 my_bsc.build_networks()
 print ('--------- Train healthy ---------')
 l_res, l_obs = my_bsc.convert_cpp_file('1127', files1127[0:20], True)
@@ -35,7 +35,7 @@ l_obs_koho = my_bsc.obs_classify(l_obs, l_res)
 my_bsc.simulated_annealing(l_obs, l_obs_koho, l_res, 0.10, 14, 0.8, True)
 #test healthy
 l_res, l_obs = my_bsc.convert_cpp_file('1127', files1127[20:22], True)
-success, l_of_res = my_bsc.test(l_obs, l_res, True, True)
+success, l_of_res = my_bsc.test(l_obs, l_res, True)
 my_bsc.plot_result(l_of_res)
 print '--------- end ---------'
 

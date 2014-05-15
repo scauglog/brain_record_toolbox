@@ -41,7 +41,7 @@ files = {'r31':
 
 number_of_chan = 128
 group_chan_by = 1
-my_bsc = bsc.brain_state_calculate(number_of_chan, group_chan_by)
+my_bsc = bsc.brain_state_calculate(number_of_chan, group_chan_by, 'koho')
 #number of chan after grouping
 number_of_chan /=group_chan_by
 f = open('chan_evo_result.txt', 'w')

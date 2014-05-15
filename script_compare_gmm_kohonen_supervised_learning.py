@@ -10,7 +10,7 @@ ext_img = '.png'
 save = False
 show = False
 files0423 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-my_bsc = bsc.brain_state_calculate(32, 1, ext_img, save, show)
+my_bsc = bsc.brain_state_calculate(32, 1, 'koho', ext_img, save, show)
 my_bsc.build_networks()
 print ('--------- Train ---------')
 l_res, l_obs = my_bsc.convert_cpp_file(dir_name, 't_0423', files0423[0:5], False)
@@ -19,7 +19,7 @@ l_obs_koho = my_bsc.obs_classify(l_obs, l_res)
 my_bsc.simulated_annealing(l_obs, l_obs_koho, l_res, 0.10, 14, 0.95, True)
 #test
 l_res, l_obs = my_bsc.convert_cpp_file(dir_name, 't_0423', files0423[5:6], False)
-success, l_of_res = my_bsc.test(l_obs, l_res, True, True)
+success, l_of_res = my_bsc.test(l_obs, l_res, True)
 l_res_gmm, l_obs_trash = my_bsc.convert_cpp_file(dir_name, 't_0423', files0423[5:6], True)
 l_of_res.append(np.array(l_res_gmm).argmax(1))
 my_bsc.plot_result(l_of_res, '_file_'+str(files0423[5:6])+'_')

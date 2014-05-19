@@ -314,7 +314,7 @@ class brain_state_calculate:
             #while the network don't give 2 classes
             n = 0
             while True:
-                net = kn.Kohonen(12, 7, 32, 5, 0.1, 3, 2, self.ext_img, False, False)
+                net = kn.Kohonen(12, 7, l_obs[0].shape[0], 5, 0.1, 3, 2, self.ext_img, False, False)
 
                 for i in range(10):
                     net.algo_kohonen(l_obs, False)

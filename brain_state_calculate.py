@@ -1,4 +1,4 @@
-import kohonen_neuron as kn
+import kohonen_neuron_c as kn
 import csv
 import numpy as np
 import copy
@@ -197,17 +197,17 @@ class brain_state_calculate:
 
     def convert_brain_state(self, obs):
         #convert what we read in the file to correct brain state
-        obs_converted = []
+        obs_converted = np.array(range(len(obs)/self.group_chan))
         #convert obs from string to float
-        obs = map(float, obs)
+        obs_converted = map(float, obs_converted)
         #sum chan X by X (X=self.group_chan)
-        res = 0
+        res = 0.0
         for i in range(len(obs)):
             if i % self.group_chan == 0:
-                obs_converted.append(res)
-                res = 0
-            res += obs[i]
-        return obs_converted
+                obs_converted[i/self.group_chan] = res
+                res = 0.0
+            res += float(obs[i])
+        return np.array(obs_converted)
 
     def obs_classify(self, l_obs, l_res):
         #classify obs using the cue
@@ -303,7 +303,6 @@ class brain_state_calculate:
                         for n in range(i-abs(obs_to_add), i):
                             if 0 < n < len(l_obs):
                                 obs_to_remove.append(l_obs[n])
-        print obs_to_remove, len(l_obs_walk)
         if len(obs_to_remove) > 0:
             l_obs_walk[:] = [obs for obs in l_obs_walk if obs not in obs_to_remove]
         print len(l_obs_walk)
@@ -354,7 +353,7 @@ class brain_state_calculate:
                 l_obs_koho = [dict_res[stop], dict_res[walk]]
                 nb_stop = len(dict_res[stop])
                 nb_walk = len(dict_res[walk])
-                print nb_stop, nb_walk, nb_walk/float(nb_stop)
+                print 'nb stop', nb_stop, 'nb_walk', nb_walk, nb_walk/float(nb_stop)
                 if acceptance_factor > 0 and (acceptance_factor < nb_walk/float(nb_stop) < 1.5) or (nb_walk + nb_stop < 150 and nb_walk > 20):
                     return l_obs_koho
                 elif acceptance_factor == 0:
@@ -369,16 +368,16 @@ class brain_state_calculate:
             print "no previous modulated chan, so learn using kohonen"
             return self.obs_classify_kohonen(l_obs)
 
-        l_obs = np.array(l_obs)
+        #l_obs = np.array(l_obs)
 
         success, l_of_res = self.test(l_obs, l_res)
         obs_stop = []
         obs_walk = []
-        for i in range(l_obs.shape[0]):
-            if l_res[i] == [1, 0]:
-                obs_stop.append(l_obs[i, :])
-            elif l_of_res[self.name][i] == 1 and l_res[i] == [0, 1]:
-                obs_walk.append(l_obs[i, :])
+        for i in range(len(l_obs)):
+            if l_res[i] == self.stop:
+                obs_stop.append(l_obs[i])
+            elif l_of_res[self.name][i] == self.walk.index(1) and l_res[i] == self.walk:
+                obs_walk.append(l_obs[i])
                 self.add_extra_obs(l_obs, l_res, obs_to_add, l_of_res[self.name], i, self.walk, obs_walk)
         return [obs_stop, obs_walk]
 
@@ -403,10 +402,10 @@ class brain_state_calculate:
                             l_obs_state.append(l_obs[n])
                 elif obs_to_add < 0:
                     for n in range(i-abs(obs_to_add), i):
-                        if 0 < n < len(l_res) and l_res[n] == res_expected:
+                        if 0 < n < len(l_res):
                             obs_to_remove.append(l_obs[n])
                     for n in range(i, i+abs(obs_to_add)):
-                        if 0 < n < len(l_res) and l_res[n] == res_expected:
+                        if 0 < n < len(l_res):
                             obs_to_remove.append(l_obs[n])
         if len(obs_to_remove) > 0:
             l_obs_state[:] = [obs for obs in l_obs_state if obs not in obs_to_remove]
@@ -499,22 +498,25 @@ class brain_state_calculate:
             return 0, {}
 
     def plot_result(self, list_of_res, extra_txt=''):
-        plt.figure()
-        plt.ylim(-0.2, len(list_of_res)*1.2+0.2)
-        for i in range(len(list_of_res['gnd_truth'])):
-            if list_of_res['gnd_truth'][i-1] != list_of_res['gnd_truth'][i]:
-                plt.vlines(i, -0.2, len(list_of_res)*1.2+0.2, 'b', '--')
+        plt.figure(figsize=(10, 14))
+
         cpt = 0
         color=['b', 'r', 'g', 'm', 'c', 'y', 'k']
         for key in list_of_res:
             plt.subplot(len(list_of_res.keys()), 1, cpt)
-            plt.plot(list_of_res[key], color[cpt], label=key)
+            plt.plot(list_of_res[key], color[cpt%len(color)], label=key)
+            plt.ylabel(key, rotation=0)
+            plt.ylim(-0.2, 1.2)
+            for i in range(len(list_of_res['gnd_truth'])):
+                if list_of_res['gnd_truth'][i-1] != list_of_res['gnd_truth'][i]:
+                    plt.vlines(i, -0.2, len(list_of_res)*1.2+0.2, 'b', '--')
             cpt += 1
-            cpt %= len(color)
+
+        plt.tight_layout()
 
         if self.save:
-            plt.savefig('tmp_fig/'+'GMM_vs_kohonen' + extra_txt + self.ext_img, bbox_inches='tight')
-            plt.savefig('tmp_fig/'+'GMM_vs_kohonen' + extra_txt + '.eps', bbox_inches='tight')
+            plt.savefig('tmp_fig/'+'GMM_vs_kohonen' + extra_txt + self.ext_img, dpi=100)
+            plt.savefig('tmp_fig/'+'GMM_vs_kohonen' + extra_txt + '.eps', dpi=100)
         if not self.show:
             plt.close()
 
@@ -571,6 +573,7 @@ class brain_state_calculate:
 
     def save_networks(self, dir_name, date):
         #save networks
+        print 'Saving network'
         with open(dir_name + 'koho_networks_' + date, 'wb') as my_file:
             my_pickler = pickle.Pickler(my_file)
             my_pickler.dump(self.koho)
@@ -739,13 +742,13 @@ class brain_state_calculate:
 
         return np.array(walk_before_cue), np.array(walk_after_cue)
 
-    def train_nets(self, l_obs, l_res, with_RL=True):
+    def train_nets(self, l_obs, l_res, with_RL=True, obs_to_add=0):
         #we use l_obs_mod only to classify result
         if with_RL:
             save_koho = copy.copy(self.koho)
         success, l_of_res = self.test(l_obs, l_res, on_modulate_chan=False)
 
-        l_obs_koho = self.obs_classify_mod_chan(l_obs, l_res, 0)
+        l_obs_koho = self.obs_classify_mod_chan(l_obs, l_res, obs_to_add)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
 
         # success, l_of_res = self.test(l_obs, l_res, test_mod=False)
@@ -820,6 +823,9 @@ class brain_state_calculate:
             if c not in self.mod_chan:
                 obs_mod[c] = 0
         return obs_mod
+
+    def show_fig(self):
+        plt.show()
 
 class cpp_file_tools:
     def __init__(self, chan_count, group_chan, ext_img='.png', save=False, show=False):

@@ -42,44 +42,50 @@ def train3(files, rat, date, my_bsc_RL, my_bsc_no_RL, min_obs, min_obs_train, ob
             l_of_res['GMM_gnd_truth'] = l_res_gmm_rl[0, 0:size_trial]
             print success
             my_bsc_RL.plot_result(l_of_res, '_fileRLonWorst_'+rat+'_'+date+'_'+str(files[rat][date][n:n+1]))
-
             #when new day first learn with mod_chan
             if new_date:
                 new_date = False
-                l_obs_koho = my_bsc_RL.obs_classify_mod_chan(l_obs, l_res, 0)
-                #l_obs_koho = my_bsc.obs_classify_mod_chan(l_obs, l_res, mod_chan)
-                my_bsc_RL.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
-                my_bsc_no_RL.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
+                try:
+                    l_obs_koho = my_bsc_RL.obs_classify_mod_chan(l_obs, l_res, 0)
+                    #l_obs_koho = my_bsc.obs_classify_mod_chan(l_obs, l_res, mod_chan)
+                    my_bsc_RL.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
+                    my_bsc_no_RL.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
+                except ValueError:
+                    print 'go to the next trial'
+
 
             #in any case training
-            start_time=time.time()
-            my_bsc_RL.train_nets(l_obs, l_res)
-            end_time=time.time()
-            print '######### time RL : '+str(end_time-start_time)+' #########'
-            start_time=time.time()
-            my_bsc_no_RL.train_nets(l_obs, l_res, with_RL=False)
-            end_time=time.time()
-            print '######### time without RL = '+str(end_time-start_time)+' #########'
-            #we update the modulated channel
-            my_bsc_RL.get_mod_chan(l_obs)
-            my_bsc_no_RL.get_mod_chan(l_obs)
+            start_time = time.time()
+            try:
+                my_bsc_RL.train_nets(l_obs, l_res, obs_to_add=0)
+                end_time = time.time()
+                print '######### time RL : '+str(end_time-start_time)+' #########'
+                start_time = time.time()
+                my_bsc_no_RL.train_nets(l_obs, l_res, obs_to_add=0, with_RL=False)
+                end_time = time.time()
+                print '######### time without RL = '+str(end_time-start_time)+' #########'
+                #we update the modulated channel
+                my_bsc_RL.get_mod_chan(l_obs)
+                my_bsc_no_RL.get_mod_chan(l_obs)
+                #we compare our result with the GMM result to see wich method is better
+                # tmp_koho_pts, tmp_GMM_pts, tmp_success_rate_koho, tmp_sucess_rate_GMM = compare_result(l_of_res[2], l_of_res[-2], l_of_res[0])
+                # koho_pts += tmp_koho_pts
+                # GMM_pts += tmp_GMM_pts
+                sr_dict['koho_RL'].append(my_bsc_RL.success_rate(l_of_res[my_bsc_RL.name], l_of_res['gnd_truth']))
+                sr_dict['koho'].append(my_bsc_RL.success_rate(l_of_res[my_bsc_no_RL.name], l_of_res['gnd_truth']))
+                sr_dict['GMM_offline_RL'].append(my_bsc_RL.success_rate(l_of_res['GMM_RL'], l_of_res['GMM_gnd_truth']))
+                sr_dict['GMM_offline'].append(my_bsc_RL.success_rate(l_of_res['GMM'], l_of_res['GMM_gnd_truth']))
+                sr_dict['GMM_online'].append(my_bsc_RL.success_rate(l_of_res['GMM_online'], l_of_res['gnd_truth']))
+                # if tmp_koho_pts > tmp_GMM_pts:
+                #     koho_win += 1
+                # elif tmp_GMM_pts > tmp_koho_pts:
+                #     GMM_win += 1
+                # else:
+                #     koho_win += 1
+                #     GMM_win += 1
+            except ValueError:
+                print 'goto the next trial'
 
-            #we compare our result with the GMM result to see wich method is better
-            # tmp_koho_pts, tmp_GMM_pts, tmp_success_rate_koho, tmp_sucess_rate_GMM = compare_result(l_of_res[2], l_of_res[-2], l_of_res[0])
-            # koho_pts += tmp_koho_pts
-            # GMM_pts += tmp_GMM_pts
-            sr_dict['koho_RL'].append(my_bsc_RL.success_rate(l_of_res[my_bsc_RL.name], l_of_res['gnd_truth']))
-            sr_dict['koho'].append(my_bsc_RL.success_rate(l_of_res[my_bsc_no_RL.name], l_of_res['gnd_truth']))
-            sr_dict['GMM_offline_RL'].append(my_bsc_RL.success_rate(l_of_res['GMM_RL'], l_of_res['GMM_gnd_truth']))
-            sr_dict['GMM_offline'].append(my_bsc_RL.success_rate(l_of_res['GMM'], l_of_res['GMM_gnd_truth']))
-            sr_dict['GMM_online'].append(my_bsc_RL.success_rate(l_of_res['GMM_online'], l_of_res['gnd_truth']))
-            # if tmp_koho_pts > tmp_GMM_pts:
-            #     koho_win += 1
-            # elif tmp_GMM_pts > tmp_koho_pts:
-            #     GMM_win += 1
-            # else:
-            #     koho_win += 1
-            #     GMM_win += 1
 
     return sr_dict
 
@@ -123,16 +129,16 @@ files = {'r32': OrderedDict([
              ('12', range(27, 54)),
              ('13', range(32, 63))]),
          }
-files = {'r32': OrderedDict([
-             ('03', range(25, 45))]),
-         }
+# files = {'r32': OrderedDict([
+#              ('03', range(25, 45))]),
+#          }
 
 #####################
 ######  START  ######
 save_obj = True
 ext_img = '.png'
-save = False
-show = True
+save = True
+show = False
 HMM = True
 verbose = False
 number_of_chan = 128
@@ -148,6 +154,7 @@ my_bsc_RL.save = save
 my_bsc_RL.show = show
 
 sr={}
+global_time_start = time.time()
 for rat in files.keys():
     init_networks = True
     my_bsc_RL.build_networks()
@@ -166,7 +173,7 @@ for rat in files.keys():
         if init_networks:
             init_networks = False
             ##build one koho network and class obs with unsupervised learning
-            l_res, l_obs = my_bsc_RL.convert_cpp_file(dir_name, '12'+date, files[rat][date][0:5], False, 'SCIOutput_')
+            l_res, l_obs = my_bsc_RL.convert_cpp_file(dir_name, '12'+date, files[rat][date][0:5], False, 'SCIOutput_', cut_after_cue=True)
             l_obs_koho = my_bsc_RL.obs_classify_kohonen(l_obs)
             #train networks
             my_bsc_RL.simulated_annealing(l_obs, l_obs_koho, l_res, 0.10, 14, 0.95)
@@ -181,6 +188,7 @@ for rat in files.keys():
 with open('success_rate_SCI_r32_v2', 'wb') as my_file:
     my_pickler = pickle.Pickler(my_file)
     my_pickler.dump(sr)
-
+delta_time = time.time()-global_time_start
+print("#####  "+str(delta_time)+'  #####')
 print('###############')
 print('####  END  ####')

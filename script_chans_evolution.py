@@ -41,7 +41,7 @@ files = {'r31':
 
 number_of_chan = 128
 group_chan_by = 1
-my_bsc = bsc.brain_state_calculate(number_of_chan, group_chan_by, 'koho')
+my_cft = bsc.cpp_file_tools(number_of_chan, group_chan_by)
 #number of chan after grouping
 number_of_chan /=group_chan_by
 f = open('chan_evo_result.txt', 'w')
@@ -66,7 +66,7 @@ for rat in files.keys():
     for date in files[rat].keys():
         file_date = '12'+date
         dir_name = base_dir+'Dec'+date+'/'+rat+'/'
-        l_res, tmp_obs = my_bsc.convert_cpp_file(dir_name, file_date, files[rat][date], False, 'SCIOutput_')
+        l_res, tmp_obs = my_cft.convert_cpp_file(dir_name, file_date, files[rat][date], False, 'SCIOutput_')
         l_obs = np.array(tmp_obs)
         all_chan_means[rat].append(l_obs.mean(0))
         all_chan_stds[rat].append(l_obs.std(0))

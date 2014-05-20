@@ -4,9 +4,14 @@ import numpy as np
 import signal_processing as sp
 import time
 import pickle
+import random as rnd
+from scipy.stats.mstats import mquantiles
+
+def shuffle_obs(l_obs):
+    rnd.shuffle(l_obs)
 
 #train the network each day with mixed res and the new day with mod_chan
-def train3(files, rat, date, my_bsc_RL, my_bsc_no_RL, min_obs, min_obs_train, obs_to_add, start, mod_chan):
+def train3(files, rat, date, my_bsc_RL, my_bsc_no_RL, my_cft, min_obs, obs_to_add, start):
     new_date = True
     koho_win = 0
     GMM_win = 0
@@ -19,14 +24,16 @@ def train3(files, rat, date, my_bsc_RL, my_bsc_no_RL, min_obs, min_obs_train, ob
     #for each file of the day (=date)
     for n in range(start, len(files[rat][date])-1):
         #get obs
-        l_res, l_obs = my_bsc_RL.convert_cpp_file(dir_name, '12'+date, files[rat][date][n:n+1], False, 'SCIOutput_')
+        l_res, l_obs = my_cft.convert_cpp_file(dir_name, '12'+date, files[rat][date][n:n+1], False, 'SCIOutput_', cut_after_cue=True)
+        #shuffle_obs(l_obs)
+        l_obs=obs_to_hist(l_obs)
         #if the trial is too short or have no neuron modulated we don't train
         if len(l_obs) > min_obs and np.array(l_obs).sum() > 0:
 
             #test and plot
             success, l_of_res = my_bsc_RL.test(l_obs, l_res)
             success2, l_of_res2 = my_bsc_no_RL.test(l_obs, l_res)
-            l_res_gnd_truth, l_obs_trash = my_bsc_RL.convert_cpp_file(dir_name, '12'+date, files[rat][date][n:n+1], True, 'SCIOutput_')
+            l_res_gnd_truth, l_obs_trash = my_cft.convert_cpp_file(dir_name, '12'+date, files[rat][date][n:n+1], True, 'SCIOutput_', cut_after_cue=True)
             l_res_gmm_rl = np.array(my_sp.load_m('GMM_RL_matrix_result/12'+date+'_resGMMwithRL_'+str(files[rat][date][n])+'.mat','res'))
             l_res_gmm = np.array(my_sp.load_m('GMM_RL_matrix_result/12'+date+'_resGMM_'+str(files[rat][date][n])+'.mat','res'))
             l_res_gmm_rl -= 2
@@ -41,14 +48,14 @@ def train3(files, rat, date, my_bsc_RL, my_bsc_no_RL, min_obs, min_obs_train, ob
             l_of_res['GMM_online'] = np.array(l_res_gnd_truth).argmax(1)
             l_of_res['GMM_gnd_truth'] = l_res_gmm_rl[0, 0:size_trial]
             print success
-            my_bsc_RL.plot_result(l_of_res, '_fileRLonWorst_'+rat+'_'+date+'_'+str(files[rat][date][n:n+1]))
+            my_cft.plot_result(l_of_res, '_fileRLonWorst_'+rat+'_'+date+'_'+str(files[rat][date][n:n+1]))
             #when new day first learn with mod_chan
             if new_date:
                 new_date = False
                 try:
-                    l_obs_koho = my_bsc_RL.obs_classify_mod_chan(l_obs, l_res, 0)
-                    #l_obs_koho = my_bsc.obs_classify_mod_chan(l_obs, l_res, mod_chan)
+                    l_obs_koho = my_cft.obs_classify_mod_chan(l_obs, l_res, l_of_res[my_bsc_RL.name], my_bsc_RL.mod_chan, obs_to_add)
                     my_bsc_RL.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
+                    l_obs_koho = my_cft.obs_classify_mod_chan(l_obs, l_res, l_of_res2[my_bsc_no_RL.name], my_bsc_no_RL.mod_chan, obs_to_add)
                     my_bsc_no_RL.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
                 except ValueError:
                     print 'go to the next trial'
@@ -57,25 +64,25 @@ def train3(files, rat, date, my_bsc_RL, my_bsc_no_RL, min_obs, min_obs_train, ob
             #in any case training
             start_time = time.time()
             try:
-                my_bsc_RL.train_nets(l_obs, l_res, obs_to_add=0)
+                my_bsc_RL.train_nets(l_obs, l_res, my_cft, obs_to_add=obs_to_add)
                 end_time = time.time()
                 print '######### time RL : '+str(end_time-start_time)+' #########'
                 start_time = time.time()
-                my_bsc_no_RL.train_nets(l_obs, l_res, obs_to_add=0, with_RL=False)
+                my_bsc_no_RL.train_nets(l_obs, l_res, my_cft, obs_to_add=obs_to_add, with_RL=False)
                 end_time = time.time()
                 print '######### time without RL = '+str(end_time-start_time)+' #########'
                 #we update the modulated channel
-                my_bsc_RL.get_mod_chan(l_obs)
-                my_bsc_no_RL.get_mod_chan(l_obs)
+                my_bsc_RL.mod_chan = my_cft.get_mod_chan(l_obs)
+                my_bsc_no_RL.mod_chan = my_cft.get_mod_chan(l_obs)
                 #we compare our result with the GMM result to see wich method is better
                 # tmp_koho_pts, tmp_GMM_pts, tmp_success_rate_koho, tmp_sucess_rate_GMM = compare_result(l_of_res[2], l_of_res[-2], l_of_res[0])
                 # koho_pts += tmp_koho_pts
                 # GMM_pts += tmp_GMM_pts
-                sr_dict['koho_RL'].append(my_bsc_RL.success_rate(l_of_res[my_bsc_RL.name], l_of_res['gnd_truth']))
-                sr_dict['koho'].append(my_bsc_RL.success_rate(l_of_res[my_bsc_no_RL.name], l_of_res['gnd_truth']))
-                sr_dict['GMM_offline_RL'].append(my_bsc_RL.success_rate(l_of_res['GMM_RL'], l_of_res['GMM_gnd_truth']))
-                sr_dict['GMM_offline'].append(my_bsc_RL.success_rate(l_of_res['GMM'], l_of_res['GMM_gnd_truth']))
-                sr_dict['GMM_online'].append(my_bsc_RL.success_rate(l_of_res['GMM_online'], l_of_res['gnd_truth']))
+                sr_dict['koho_RL'].append(my_cft.success_rate(l_of_res[my_bsc_RL.name], l_of_res['gnd_truth']))
+                sr_dict['koho'].append(my_cft.success_rate(l_of_res[my_bsc_no_RL.name], l_of_res['gnd_truth']))
+                sr_dict['GMM_offline_RL'].append(my_cft.success_rate(l_of_res['GMM_RL'], l_of_res['GMM_gnd_truth']))
+                sr_dict['GMM_offline'].append(my_cft.success_rate(l_of_res['GMM'], l_of_res['GMM_gnd_truth']))
+                sr_dict['GMM_online'].append(my_cft.success_rate(l_of_res['GMM_online'], l_of_res['gnd_truth']))
                 # if tmp_koho_pts > tmp_GMM_pts:
                 #     koho_win += 1
                 # elif tmp_GMM_pts > tmp_koho_pts:
@@ -89,6 +96,12 @@ def train3(files, rat, date, my_bsc_RL, my_bsc_no_RL, min_obs, min_obs_train, ob
 
     return sr_dict
 
+def obs_to_hist(l_obs):
+    l_hist = []
+    qVec=np.array(np.arange(0.1,1,0.1))
+    for obs in l_obs:
+        l_hist.append(mquantiles(obs,qVec))
+    return l_hist
 
 base_dir = '../RT_classifier/BMIOutputs/BMISCIOutputs/'
 # files = {'r31': OrderedDict([
@@ -135,6 +148,7 @@ files = {'r32': OrderedDict([
 
 #####################
 ######  START  ######
+hist=True
 save_obj = True
 ext_img = '.png'
 save = True
@@ -143,8 +157,9 @@ HMM = True
 verbose = False
 number_of_chan = 128
 group_chan_by = 4
-my_bsc_RL = bsc.brain_state_calculate(number_of_chan, group_chan_by, 'koho_RL')
-my_bsc_no_RL = bsc.brain_state_calculate(number_of_chan, group_chan_by, 'koho')
+my_bsc_RL = bsc.brain_state_calculate(number_of_chan/group_chan_by, 'koho_RL')
+my_cft = my_bsc_RL.build_cpp_file_tools(number_of_chan, group_chan_by)
+my_bsc_no_RL = bsc.brain_state_calculate(number_of_chan/group_chan_by, 'koho')
 #number of obs for stop and start we should have to train the network with kohonen
 min_obs_train = 10
 #number of obs we should have to test the file
@@ -157,6 +172,11 @@ sr={}
 global_time_start = time.time()
 for rat in files.keys():
     init_networks = True
+    if hist:
+        my_bsc_RL.weight_count = 9
+        my_bsc_RL.A = np.array([[0.90, 0.10], [0.10, 0.90]])
+        my_bsc_no_RL.weight_count = 9
+        my_bsc_no_RL.A = np.array([[0.90, 0.10], [0.10, 0.90]])
     my_bsc_RL.build_networks()
     my_bsc_no_RL.build_networks()
     koho_win_r = 0
@@ -173,19 +193,22 @@ for rat in files.keys():
         if init_networks:
             init_networks = False
             ##build one koho network and class obs with unsupervised learning
-            l_res, l_obs = my_bsc_RL.convert_cpp_file(dir_name, '12'+date, files[rat][date][0:5], False, 'SCIOutput_', cut_after_cue=True)
-            l_obs_koho = my_bsc_RL.obs_classify_kohonen(l_obs)
+            l_res, l_obs = my_cft.convert_cpp_file(dir_name, '12'+date, files[rat][date][0:5], False, 'SCIOutput_', cut_after_cue=True)
+            #shuffle_obs(l_obs)
+            l_obs = obs_to_hist(l_obs)
+            l_obs_koho = my_cft.obs_classify_kohonen(l_obs)
             #train networks
             my_bsc_RL.simulated_annealing(l_obs, l_obs_koho, l_res, 0.10, 14, 0.95)
             my_bsc_no_RL.simulated_annealing(l_obs, l_obs_koho, l_res, 0.10, 14, 0.95)
             start = 5
-            mod_chan = my_bsc_RL.get_mod_chan(l_obs)
+            my_bsc_RL.mod_chan = my_cft.get_mod_chan(l_obs)
+            my_bsc_no_RL.mod_chan = my_cft.get_mod_chan(l_obs)
         else:
             start = 0
-        sr[rat][date] = train3(files, rat, date, my_bsc_RL, my_bsc_no_RL, min_obs, min_obs_train, obs_to_add, start, mod_chan)
+        sr[rat][date] = train3(files, rat, date, my_bsc_RL, my_bsc_no_RL, my_cft, min_obs, obs_to_add, start)
 
 
-with open('success_rate_SCI_r32_v2', 'wb') as my_file:
+with open('success_rate_SCI_r32_hist', 'wb') as my_file:
     my_pickler = pickle.Pickler(my_file)
     my_pickler.dump(sr)
 delta_time = time.time()-global_time_start

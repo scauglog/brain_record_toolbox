@@ -7,22 +7,17 @@ import math
 import matplotlib.pyplot as plt
 from itertools import combinations
 import pickle
+from scipy.stats.mstats import mquantiles
 
 class brain_state_calculate:
-    def __init__(self, chan_count, group_chan, name, ext_img='.png', save=False, show=False):
+    def __init__(self, weight_count, name='koho', ext_img='.png', save=False, show=False):
         rnd.seed(42)
-        #group channel by
-        self.group_chan = group_chan
         #result for the state
         self.stop = [1, 0]
-        self.walk = [0, 1]
         self.default_res = [0, 0]
         self.ext_img = ext_img
         self.save = save
         self.show = show
-        #params for file converter
-        self.first_chan = 7
-        self.chan_count = chan_count
 
         #params for Test
         self.test_all = False
@@ -43,7 +38,7 @@ class brain_state_calculate:
         #number of best neurons to keep for calculate distance of obs to the network
         self.dist_count = 3
         self.max_weight = 5
-        self.weight_count = self.chan_count/self.group_chan
+        self.weight_count = weight_count
 
         #simulated annealing parameters
         #change alpha each X iteration
@@ -53,12 +48,15 @@ class brain_state_calculate:
         self.change_alpha_factor = 10.0
 
         #other parameter
-        #store consecutive not a successfull trial
+        #store consecutive not a successfull trial used for train_nets
         self.was_bad = 0
         #channel modulated they are all modulated at the beginning
         self.mod_chan = range(self.weight_count)
         self.verbose = True
         self.name = name
+
+    def build_cpp_file_tools(self, chan_count, group_chan):
+        return cpp_file_tools(chan_count, group_chan, self.ext_img, self.save, self.show)
 
     def build_networks(self):
         #build the network
@@ -69,13 +67,23 @@ class brain_state_calculate:
     def load_networks(self, path):
         print path
         pkl_file = open(path, 'rb')
-        self.koho = pickle.load(pkl_file)
+        dict = pickle.load(pkl_file)
+        self.koho = dict['networks']
+        self.mod_chan = dict['mod_chan']
         print len(self.koho)
 
-    def init_networks(self, l_obs, l_res):
-        l_obs_koho = self.obs_classify_kohonen(l_obs)
+    def save_networks(self, dir_name, date):
+        #save networks
+        print 'Saving network'
+        dict={'networks': self.koho, 'mod_chan': self.mod_chan}
+        with open(dir_name + 'koho_networks_' + date, 'wb') as my_file:
+            my_pickler = pickle.Pickler(my_file)
+            my_pickler.dump(dict)
+
+    def init_networks(self, l_obs, l_res, cft):
+        l_obs_koho = cft.obs_classify_kohonen(l_obs)
         #train networks
-        self.get_mod_chan(l_obs)
+        self.mod_chan = cft.get_mod_chan(l_obs)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, 0.10, 14, 0.95)
 
     def init_test(self):
@@ -134,6 +142,233 @@ class brain_state_calculate:
         rank = self.history.mean(0).argmax()
         self.result=rank
         return rank
+
+    def test(self, l_obs, l_res, on_modulate_chan=True):
+        good = 0
+
+        #matrix which contain the rank of the result
+        results_dict={'gnd_truth':[], self.name+'_raw':[], self.name:[]}
+        results = []
+        raw_res = []
+        self.init_test()
+
+        for i in range(len(l_obs)):
+            self.test_one_obs(l_obs[i], on_modulate_chan)
+            results_dict[self.name+'_raw'].append(self.raw_res)
+            results_dict[self.name].append(self.result)
+            raw_res.append(copy.copy(self.raw_res))
+            results.append(copy.copy(self.result))
+            if self.result == np.array(l_res[i]).argmax():
+                good += 1
+
+        if len(l_obs) > 0:
+            results_dict['gnd_truth'] = np.array(l_res).argmax(1)
+            return good/float(len(l_obs)), results_dict
+        else:
+            print ('l_obs is empty')
+            return 0, {}
+
+    def get_only_mod_chan(self, obs):
+        obs_mod = copy.copy(np.array(obs))
+        #keep only chan that where modulated
+        for c in range(obs_mod.shape[0]):
+            if c not in self.mod_chan:
+                obs_mod[c] = 0
+        return obs_mod
+
+    @staticmethod
+    def obs_to_quantiles(obs):
+        #9 quantiles from 10% to 90% step 10%
+        qVec=np.array(np.arange(0.1, 1, 0.1))
+        return mquantiles(obs, qVec)
+
+    def compute_network_accuracy(self, best_ns, dist_res, obs):
+        #we test combination of each best n
+        #return an array of probability (prob of the obs to be state X)
+        dist_comb = []
+        if self.test_all:
+            #test all combinations
+            all_comb = combinations(best_ns, self.dist_count)
+            for c in all_comb:
+                l_dist = []
+                for n in c:
+                    l_dist.append(n.calc_error(obs))
+                dist_comb.append(np.array(l_dist).mean())
+        else:
+            #test some combinations
+            for c in range(self.combination_to_test):
+                l_dist = []
+                for n in self.random_combination(best_ns, self.dist_count):
+                    l_dist.append(n.calc_error(obs))
+                dist_comb.append(np.array(l_dist).mean())
+
+        prob_res = []
+        #sort each dist for combination and find where the result of each network is in the sorted list
+        #this give a percentage of accuracy for the network
+        dist_comb = np.array(sorted(dist_comb, reverse=True))
+        for k in range(len(self.koho)):
+            prob = abs(dist_comb-dist_res[k]).argmin()/float(len(dist_comb))
+            if prob == 0.0:
+                prob = 0.01
+            prob_res.append(prob)
+
+        return np.array(prob_res)
+
+    def compute_network_accuracy_p(self, best_ns, obs):
+        #return an array of probability (prob of the obs to be state X)
+        #prob is computed using the class of the nearest neighbor of the obs
+        #store all distance
+        dist_all = []
+        #store all distance to a specific network
+        dist_net = []
+        #find the distance between the obs and each nearest neighbor
+        for k in best_ns:
+            tmp_l = []
+            for n in k:
+                dst = n.calc_error(obs)
+                dist_all.append(dst)
+                tmp_l.append(dst)
+
+            dist_net.append(tmp_l)
+        dist_all.sort()
+        prob_res = []
+        #for each state (network)
+        for net in dist_net:
+            count = 0
+            for i in range(self.dist_count):
+                if dist_all[i] in net:
+                    count += 1
+            prob_res.append(count/float(self.dist_count))
+        return np.array(prob_res)
+
+    @staticmethod
+    def random_combination(iterable, r):
+        #"Random selection from itertools.combinations(iterable, r)"
+        pool = tuple(iterable)
+        n = len(pool)
+        indices = sorted(rnd.sample(xrange(n), r))
+        return tuple(pool[i] for i in indices)
+
+    def simulated_annealing(self, l_obs, l_obs_koho, l_res, alpha_start, max_iteration, max_success, over_train_walk=False):
+        #inspired from simulated annealing, to determine when we should stop learning
+        #initialize
+        success, lor_trash = self.test(l_obs, l_res, on_modulate_chan=False)
+        success -= 0.1
+        alpha = alpha_start
+        n = 0
+        while success <= max_success and n < max_iteration:
+            koho_cp = copy.copy(self.koho)
+            #train each kohonen network
+            for i in range(len(koho_cp)):
+                #update learning coefficient
+                koho_cp[i].alpha = alpha
+                #no neighbor decrease for the first iteration
+                if n == 0:
+                    koho_cp[i].algo_kohonen(l_obs_koho[i], False)
+                else:
+                    koho_cp[i].algo_kohonen(l_obs_koho[i])
+            #we train walk multiple time to have same training has rest
+            if over_train_walk:
+                cpt = 0
+                if len(l_obs_koho[1]) > 0:
+                    while cpt < len(l_obs_koho[0]):
+                        koho_cp[1].algo_kohonen(l_obs_koho[1])
+                        cpt += len(l_obs_koho[1])
+            #compute success of the networks
+            success_cp, lor_trash = self.test(l_obs, l_res, on_modulate_chan=False)
+            #if we keep the same network for too long we go there
+            if math.exp(-abs(success-success_cp)/(alpha*1.0)) in [0.0, 1.0]:
+                print 'break'
+                break
+            #simulated annealing criterion to keep or not the trained network
+            if success < success_cp or rnd.random() < math.exp(-abs(success-success_cp)/(alpha*1.0)):
+                success = copy.copy(success_cp)
+                self.koho = copy.copy(koho_cp)
+
+            #learning rate decrease over iteration
+            #change learning rate
+            if n % self.change_alpha_iteration == 0:
+                alpha /= self.change_alpha_factor
+            #alpha *= Lambda
+            n += 1
+
+    def train_nets(self, l_obs, l_res, cft, with_RL=True, obs_to_add=0):
+        #we use l_obs_mod only to classify result
+        if with_RL:
+            save_koho = copy.copy(self.koho)
+        success, l_of_res = self.test(l_obs, l_res, on_modulate_chan=False)
+
+        l_obs_koho = cft.obs_classify_mod_chan(l_obs, l_res, l_of_res[self.name], self.mod_chan, obs_to_add)
+        self.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
+
+        # success, l_of_res = self.test(l_obs, l_res, test_mod=False)
+        #we look the walk in the raw result
+        walk_get = np.nonzero(l_of_res[self.name+'_raw'])[0]
+        if walk_get.shape[0] == 0:
+            self.was_bad += 1
+            if self.was_bad > 1:
+                l_obs_koho = cft.obs_classify_kohonen(l_obs)
+                self.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
+                success, l_of_res = self.test(l_obs, l_res)
+        else:
+            self.was_bad = 0
+
+        if with_RL:
+            success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
+
+            win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
+            if win1 > win2:
+                #update l_of_res in case the for loop are not in the else
+                l_of_res = l_of_res_new
+                print "better with training --------"
+            else:
+                self.koho = save_koho
+                print "worst with training"
+
+                self.koho[1].alpha = 0.1
+                self.koho[0].alpha = 0.1
+                walk_get = np.nonzero(l_of_res[self.name+'_raw'])[0]
+                walk_expected = np.nonzero(l_of_res['gnd_truth'])[0]
+                for i in range(14):
+                    #when algo say walk we try to exclude the obs from walk network and include it in rest network
+                    save_koho = copy.copy(self.koho)
+
+                    if walk_get.shape[0] > 0:
+                        for k in range(3):
+                            obs_ind = walk_get[rnd.randrange(walk_get.shape[0])]
+                            self.koho[0].update_closest_neurons(l_obs[obs_ind])
+                            self.koho[1].update_closest_neurons(l_obs[obs_ind], push_away=True)
+
+                    if walk_expected.shape[0] > 0:
+                        #when we want walk we try to include the obs in walk and exclude it from rest
+                        for k in range(3):
+                            obs_ind = walk_expected[rnd.randrange(walk_expected.shape[0])]
+                            self.koho[0].update_closest_neurons(l_obs[obs_ind], push_away=True)
+                            self.koho[1].update_closest_neurons(l_obs[obs_ind])
+
+                    success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
+                    win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
+                    #if result are better we keep the network
+                    if win1 > win2:
+                        l_of_res = l_of_res_new
+                        print "better ---"
+                    else:
+                        self.koho = save_koho
+                        print "worst"
+
+class cpp_file_tools:
+    def __init__(self, chan_count, group_chan, ext_img='.png', save=False, show=False):
+         #group channel by
+        self.group_chan = group_chan
+        #result for the state
+        self.stop = [1, 0]
+        self.walk = [0, 1]
+        self.ext_img = ext_img
+        self.save = save
+        self.show = show
+        #params for file converter
+        self.first_chan = 7
+        self.chan_count = chan_count
 
     def convert_cpp_file(self, dir_name, date, files, is_healthy=False, file_core_name='healthyOutput_', cut_after_cue=False, init_in_walk=True):
         #convert cpp file to list of obs and list of res
@@ -209,6 +444,12 @@ class brain_state_calculate:
             res += float(obs[i])
         return np.array(obs_converted)
 
+    def get_mod_chan(self, l_obs):
+        #return the chan where a neuron is active (modulated chan)
+        l_obs = np.array(l_obs)
+        mod_chan = l_obs.sum(0).nonzero()[0]
+        return mod_chan
+
     def obs_classify(self, l_obs, l_res):
         #classify obs using the cue
         l_obs_stop = []
@@ -220,43 +461,40 @@ class brain_state_calculate:
                 l_obs_walk.append(l_obs[i])
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_good_res(self, l_obs, l_res, obs_to_add=0):
+    def obs_classify_good_res(self, l_obs, l_res, l_calc_res, obs_to_add=0):
         #add obs only if the network give the good answer
         l_obs_stop = []
         l_obs_walk = []
-        success, list_of_res = self.test(l_obs, l_res, on_modulate_chan=False)
         for i in range(1, len(l_res)-1):
-            if l_res[i] == self.stop and list_of_res[self.name][i] == self.stop.index(1):
+            if l_res[i] == self.stop and l_calc_res[i] == self.stop.index(1):
                 l_obs_stop.append(l_obs[i])
                 #when we change state and this is a good idea brain state before and after should be same state
-                self.add_extra_obs(l_obs, l_res, obs_to_add, list_of_res[self.name], i, self.stop, l_obs_stop)
+                self.add_extra_obs(l_obs, l_res, obs_to_add, l_calc_res, i, self.stop, l_obs_stop)
 
-            elif l_res[i] == self.walk and list_of_res[self.name][i] == self.walk.index(1):
+            elif l_res[i] == self.walk and l_calc_res[i] == self.walk.index(1):
                 l_obs_walk.append(l_obs[i])
-                self.add_extra_obs(l_obs, l_res, obs_to_add, list_of_res[self.name], i, self.walk, l_obs_walk)
+                self.add_extra_obs(l_obs, l_res, obs_to_add, l_calc_res, i, self.walk, l_obs_walk)
 
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_bad_res(self, l_obs, l_res, obs_to_add=0):
+    def obs_classify_bad_res(self, l_obs, l_res, l_calc_res, obs_to_add=0):
         #add obs only if the network give the bad answer
         l_obs_stop = []
         l_obs_walk = []
-        success, list_of_res = self.test(l_obs, l_res, on_modulate_chan=False)
         for i in range(1, len(l_res)-1):
-            if l_res[i] == self.stop and list_of_res[self.name][i] == self.walk.index(1):
+            if l_res[i] == self.stop and l_calc_res[i] == self.walk.index(1):
                 l_obs_stop.append(l_obs[i])
-                self.add_extra_obs(l_obs, l_res, obs_to_add, list_of_res[self.name], i, self.stop, l_obs_stop)
-            elif l_res[i] == self.walk and list_of_res[self.name][i] == self.stop.index(1):
+                self.add_extra_obs(l_obs, l_res, obs_to_add, l_calc_res, i, self.stop, l_obs_stop)
+            elif l_res[i] == self.walk and l_calc_res[i] == self.stop.index(1):
                 l_obs_walk.append(l_obs[i])
-                self.add_extra_obs(l_obs, l_res, obs_to_add, list_of_res[self.name], i, self.walk, l_obs_walk)
+                self.add_extra_obs(l_obs, l_res, obs_to_add, l_calc_res, i, self.walk, l_obs_walk)
 
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_mixed_res(self, l_obs, l_res, obs_to_add=0):
+    def obs_classify_mixed_res(self, l_obs, l_res, l_calc_res, obs_to_add=0):
         #add obs to stop when no cue and to walk only if the network give the right answer
         l_obs_stop = []
         l_obs_walk = []
-        success, list_of_res = self.test(l_obs, l_res, on_modulate_chan=False)
         #list_of_res
         #0 = res expected
         #1 = res calculate before HMM
@@ -265,30 +503,26 @@ class brain_state_calculate:
             if l_res[i] == self.stop:
                 l_obs_stop.append(l_obs[i])
 
-            elif l_res[i] == self.walk and list_of_res[self.name][i] == self.walk.index(1):
+            elif l_res[i] == self.walk and l_calc_res[i] == self.walk.index(1):
                 l_obs_walk.append(l_obs[i])
-                self.add_extra_obs(l_obs, l_res, obs_to_add, list_of_res[self.name], i, self.walk, l_obs_walk)
+                self.add_extra_obs(l_obs, l_res, obs_to_add, l_calc_res, i, self.walk, l_obs_walk)
 
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_prev_res(self, l_obs, obs_to_add=0):
+    def obs_classify_prev_res(self, l_obs, l_calc_res, obs_to_add=0):
         #we class obs using only the previous result no ground truth involved here
         #we need ground truth to call test
         l_obs_stop = []
         l_obs_walk = []
-        l_res=[]
-        for i in range(len(l_obs)):
-            l_res.append(self.test_one_obs(l_obs[i], on_modulate_chan=False))
-        print l_res
         #when obs_to add is <0 we remove obs
         obs_to_remove = []
         for i in range(1, len(l_obs)-1):
-            if l_res[i] == self.stop.index(1):
+            if l_calc_res[i] == self.stop.index(1):
                 l_obs_stop.append(l_obs[i])
-            elif l_res[i] == self.walk.index(1):
+            elif l_calc_res[i] == self.walk.index(1):
                 l_obs_walk.append(l_obs[i])
                 #before walk
-                if l_res[i] != l_res[i+1]:
+                if l_calc_res[i] != l_calc_res[i+1]:
                     if obs_to_add > 0:
                         for n in range(i-obs_to_add, i):
                             if 0 < n < len(l_obs):
@@ -304,8 +538,17 @@ class brain_state_calculate:
                             if 0 < n < len(l_obs):
                                 obs_to_remove.append(l_obs[n])
         if len(obs_to_remove) > 0:
-            l_obs_walk[:] = [obs for obs in l_obs_walk if obs not in obs_to_remove]
-        print len(l_obs_walk)
+            tmp_l = []
+            for obs in l_obs_walk:
+                to_add = True
+                for obs_r in obs_to_remove:
+                    if (obs_r == obs).all():
+                        to_add = False
+                        break
+                if to_add:
+                    tmp_l.append(obs)
+            #l_obs_walk[:] = [obs for obs in l_obs_walk if obs not in obs_to_remove]
+            l_obs_walk = tmp_l
         return [l_obs_stop, l_obs_walk]
 
     def obs_classify_kohonen(self, l_obs, acceptance_factor=0.0):
@@ -361,31 +604,22 @@ class brain_state_calculate:
             else:
                 return [[], []]
 
-    def obs_classify_mod_chan(self, l_obs, l_res, obs_to_add=0):
+    def obs_classify_mod_chan(self, l_obs, l_res, l_calc_res, mod_chan, obs_to_add=0):
         #test the net with only the chan that where modulated before
         #then classify using mixed res
-        if len(self.mod_chan) == 0:
+        if len(mod_chan) == 0:
             print "no previous modulated chan, so learn using kohonen"
             return self.obs_classify_kohonen(l_obs)
 
-        #l_obs = np.array(l_obs)
-
-        success, l_of_res = self.test(l_obs, l_res)
         obs_stop = []
         obs_walk = []
         for i in range(len(l_obs)):
             if l_res[i] == self.stop:
                 obs_stop.append(l_obs[i])
-            elif l_of_res[self.name][i] == self.walk.index(1) and l_res[i] == self.walk:
+            elif l_calc_res[i] == self.walk.index(1) and l_res[i] == self.walk:
                 obs_walk.append(l_obs[i])
-                self.add_extra_obs(l_obs, l_res, obs_to_add, l_of_res[self.name], i, self.walk, obs_walk)
+                self.add_extra_obs(l_obs, l_res, obs_to_add, l_calc_res, i, self.walk, obs_walk)
         return [obs_stop, obs_walk]
-
-    def get_mod_chan(self, l_obs):
-        #return the chan where a neuron is active (modulated chan)
-        l_obs = np.array(l_obs)
-        self.mod_chan = l_obs.sum(0).nonzero()[0]
-        return self.mod_chan
 
     @staticmethod
     def add_extra_obs(l_obs, l_res, obs_to_add, calculate_res, i, res_expected, l_obs_state):
@@ -408,175 +642,36 @@ class brain_state_calculate:
                         if 0 < n < len(l_res):
                             obs_to_remove.append(l_obs[n])
         if len(obs_to_remove) > 0:
-            l_obs_state[:] = [obs for obs in l_obs_state if obs not in obs_to_remove]
-
-    def compute_network_accuracy(self, best_ns, dist_res, obs):
-        #we test combination of each best n
-        #return an array of probability (prob of the obs to be state X)
-        dist_comb = []
-        if self.test_all:
-            #test all combinations
-            all_comb = combinations(best_ns, self.dist_count)
-            for c in all_comb:
-                l_dist = []
-                for n in c:
-                    l_dist.append(n.calc_error(obs))
-                dist_comb.append(np.array(l_dist).mean())
-        else:
-            #test some combinations
-            for c in range(self.combination_to_test):
-                l_dist = []
-                for n in self.random_combination(best_ns, self.dist_count):
-                    l_dist.append(n.calc_error(obs))
-                dist_comb.append(np.array(l_dist).mean())
-
-        prob_res = []
-        #sort each dist for combination and find where the result of each network is in the sorted list
-        #this give a percentage of accuracy for the network
-        dist_comb = np.array(sorted(dist_comb, reverse=True))
-        for k in range(len(self.koho)):
-            prob = abs(dist_comb-dist_res[k]).argmin()/float(len(dist_comb))
-            if prob == 0.0:
-                prob = 0.01
-            prob_res.append(prob)
-
-        return np.array(prob_res)
-
-    def compute_network_accuracy_p(self, best_ns, obs):
-        #return an array of probability (prob of the obs to be state X)
-        #prob is computed using the class of the nearest neighbor of the obs
-        #store all distance
-        dist_all = []
-        #store all distance to a specific network
-        dist_net = []
-        #find the distance between the obs and each nearest neighbor
-        for k in best_ns:
             tmp_l = []
-            for n in k:
-                dst = n.calc_error(obs)
-                dist_all.append(dst)
-                tmp_l.append(dst)
+            for obs in l_obs_state:
+                to_add = True
+                for obs_r in obs_to_remove:
+                    if (obs_r == obs).all():
+                        to_add = False
+                        break
+                if to_add:
+                    tmp_l.append(obs)
+            l_obs_state = tmp_l
 
-            dist_net.append(tmp_l)
-        dist_all.sort()
-        prob_res = []
-        #for each state (network)
-        for net in dist_net:
-            count = 0
-            for i in range(self.dist_count):
-                if dist_all[i] in net:
-                    count += 1
-            prob_res.append(count/float(self.dist_count))
-        return np.array(prob_res)
-
-    def test(self, l_obs, l_res, on_modulate_chan=True):
-        good = 0
-
-        # history = np.array([self.stop])
-        #matrix which contain the rank of the result
-        results_dict={'gnd_truth':[], self.name+'_raw':[], self.name:[]}
-        results = []
-        raw_res = []
-        self.init_test()
-        # prevP = np.array(self.stop)
-
-        # prob_res = copy.copy(self.default_res)
-        for i in range(len(l_obs)):
-            self.test_one_obs(l_obs[i], on_modulate_chan)
-            results_dict[self.name+'_raw'].append(self.raw_res)
-            results_dict[self.name].append(self.result)
-            raw_res.append(copy.copy(self.raw_res))
-            results.append(copy.copy(self.result))
-            if self.result == np.array(l_res[i]).argmax():
-                good += 1
-
-        if len(l_obs) > 0:
-            results_dict['gnd_truth'] = np.array(l_res).argmax(1)
-            return good/float(len(l_obs)), results_dict
-        else:
-            print ('l_obs is empty')
-            return 0, {}
-
-    def plot_result(self, list_of_res, extra_txt=''):
-        plt.figure(figsize=(10, 14))
-
-        cpt = 0
-        color=['b', 'r', 'g', 'm', 'c', 'y', 'k']
-        for key in list_of_res:
-            plt.subplot(len(list_of_res.keys()), 1, cpt)
-            plt.plot(list_of_res[key], color[cpt%len(color)], label=key)
-            plt.ylabel(key, rotation=0)
-            plt.ylim(-0.2, 1.2)
-            for i in range(len(list_of_res['gnd_truth'])):
-                if list_of_res['gnd_truth'][i-1] != list_of_res['gnd_truth'][i]:
-                    plt.vlines(i, -0.2, len(list_of_res)*1.2+0.2, 'b', '--')
-            cpt += 1
-
-        plt.tight_layout()
-
-        if self.save:
-            plt.savefig('tmp_fig/'+'GMM_vs_kohonen' + extra_txt + self.ext_img, dpi=100)
-            plt.savefig('tmp_fig/'+'GMM_vs_kohonen' + extra_txt + '.eps', dpi=100)
-        if not self.show:
-            plt.close()
-
-    def simulated_annealing(self, l_obs, l_obs_koho, l_res, alpha_start, max_iteration, max_success, over_train_walk=False):
-        #inspired from simulated annealing, to determine when we should stop learning
-        #initialize
-        success, lor_trash = self.test(l_obs, l_res, on_modulate_chan=False)
-        success -= 0.1
-        alpha = alpha_start
-        n = 0
-        while success <= max_success and n < max_iteration:
-            koho_cp = copy.copy(self.koho)
-            #train each kohonen network
-            for i in range(len(koho_cp)):
-                #update learning coefficient
-                koho_cp[i].alpha = alpha
-                #no neighbor decrease for the first iteration
-                if n == 0:
-                    koho_cp[i].algo_kohonen(l_obs_koho[i], False)
-                else:
-                    koho_cp[i].algo_kohonen(l_obs_koho[i])
-            #we train walk multiple time to have same training has rest
-            if over_train_walk:
-                cpt = 0
-                if len(l_obs_koho[1]) > 0:
-                    while cpt < len(l_obs_koho[0]):
-                        koho_cp[1].algo_kohonen(l_obs_koho[1])
-                        cpt += len(l_obs_koho[1])
-            #compute success of the networks
-            success_cp, lor_trash = self.test(l_obs, l_res, on_modulate_chan=False)
-            #if we keep the same network for too long we go there
-            if math.exp(-abs(success-success_cp)/(alpha*1.0)) in [0.0, 1.0]:
-                print 'break'
-                break
-            #simulated annealing criterion to keep or not the trained network
-            if success < success_cp or rnd.random() < math.exp(-abs(success-success_cp)/(alpha*1.0)):
-                success = copy.copy(success_cp)
-                self.koho = copy.copy(koho_cp)
-
-            #learning rate decrease over iteration
-            #change learning rate
-            if n % self.change_alpha_iteration == 0:
-                alpha /= self.change_alpha_factor
-            #alpha *= Lambda
-            n += 1
-
+    #classify the given result
     @staticmethod
-    def random_combination(iterable, r):
-        #"Random selection from itertools.combinations(iterable, r)"
-        pool = tuple(iterable)
-        n = len(pool)
-        indices = sorted(rnd.sample(xrange(n), r))
-        return tuple(pool[i] for i in indices)
+    def class_result(l_res, l_expected_res):
+        walk_before_cue = []
+        walk_after_cue = []
+        current_walk = 0
+        for i in range(len(l_res)):
+            #when we are at the end of the walk or cue change and we walk
+            if (l_res[i] != l_res[i-1] or l_expected_res[i] != l_expected_res[i-1]) and l_res[i] == 0:
+                if l_expected_res[i-1] == 0:
+                    walk_before_cue.append(current_walk)
+                else:
+                    walk_after_cue.append(current_walk)
+                current_walk = 0
 
-    def save_networks(self, dir_name, date):
-        #save networks
-        print 'Saving network'
-        with open(dir_name + 'koho_networks_' + date, 'wb') as my_file:
-            my_pickler = pickle.Pickler(my_file)
-            my_pickler.dump(self.koho)
+            if l_res[i] == 1:
+               current_walk += 1
+
+        return np.array(walk_before_cue), np.array(walk_after_cue)
 
     #classify the given result
     def compare_result(self, l_res1, l_res2, l_expected_res, no_perfect=False):
@@ -722,122 +817,28 @@ class brain_state_calculate:
         else:
             return 0
 
-    #classify the given result
-    @staticmethod
-    def class_result(l_res, l_expected_res):
-        walk_before_cue = []
-        walk_after_cue = []
-        current_walk = 0
-        for i in range(len(l_res)):
-            #when we are at the end of the walk or cue change and we walk
-            if (l_res[i] != l_res[i-1] or l_expected_res[i] != l_expected_res[i-1]) and l_res[i] == 0:
-                if l_expected_res[i-1] == 0:
-                    walk_before_cue.append(current_walk)
-                else:
-                    walk_after_cue.append(current_walk)
-                current_walk = 0
+    def plot_result(self, list_of_res, extra_txt=''):
+        plt.figure(figsize=(10, 14))
 
-            if l_res[i] == 1:
-               current_walk += 1
+        cpt = 0
+        color=['b', 'r', 'g', 'm', 'c', 'y', 'k']
+        for key in list_of_res:
+            plt.subplot(len(list_of_res.keys()), 1, cpt)
+            plt.plot(list_of_res[key], color[cpt%len(color)], label=key)
+            plt.ylabel(key, rotation=0)
+            plt.ylim(-0.2, 1.2)
+            for i in range(len(list_of_res['gnd_truth'])):
+                if list_of_res['gnd_truth'][i-1] != list_of_res['gnd_truth'][i]:
+                    plt.vlines(i, -0.2, len(list_of_res)*1.2+0.2, 'b', '--')
+            cpt += 1
 
-        return np.array(walk_before_cue), np.array(walk_after_cue)
+        plt.tight_layout()
 
-    def train_nets(self, l_obs, l_res, with_RL=True, obs_to_add=0):
-        #we use l_obs_mod only to classify result
-        if with_RL:
-            save_koho = copy.copy(self.koho)
-        success, l_of_res = self.test(l_obs, l_res, on_modulate_chan=False)
-
-        l_obs_koho = self.obs_classify_mod_chan(l_obs, l_res, obs_to_add)
-        self.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
-
-        # success, l_of_res = self.test(l_obs, l_res, test_mod=False)
-        #we look the walk in the raw result
-        walk_get = np.nonzero(l_of_res[self.name+'_raw'])[0]
-        if walk_get.shape[0] == 0:
-            self.was_bad += 1
-            if self.was_bad > 1:
-                l_obs_koho = self.obs_classify_kohonen(l_obs)
-                self.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
-                success, l_of_res = self.test(l_obs, l_res)
-        else:
-            self.was_bad = 0
-
-        if with_RL:
-            success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
-
-            win1, win2 = self.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
-            if win1 > win2:
-                #update l_of_res in case the for loop are not in the else
-                l_of_res = l_of_res_new
-                print "better with training --------"
-            else:
-                self.koho = save_koho
-                print "worst with training"
-
-                self.koho[1].alpha = 0.1
-                self.koho[0].alpha = 0.1
-                walk_get = np.nonzero(l_of_res[self.name+'_raw'])[0]
-                walk_expected = np.nonzero(l_of_res['gnd_truth'])[0]
-                for i in range(14):
-                    #when algo say walk we try to exclude the obs from walk network and include it in rest network
-                    save_koho = copy.copy(self.koho)
-
-                    if walk_get.shape[0] > 0:
-                        for k in range(3):
-                            obs_ind = walk_get[rnd.randrange(walk_get.shape[0])]
-                            self.koho[0].update_closest_neurons(l_obs[obs_ind])
-                            self.koho[1].update_closest_neurons(l_obs[obs_ind], push_away=True)
-
-                        # success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
-                        # win1, win2 = self.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
-                        # #if result are better we keep the network
-                        # if win1 > win2:
-                        #     l_of_res = l_of_res_new
-                        #     print "better ---"
-                        # else:
-                        #     self.koho = save_koho
-                        #     print "worst"
-
-                    if walk_expected.shape[0] > 0:
-                        #when we want walk we try to include the obs in walk and exclude it from rest
-                        for k in range(3):
-                            obs_ind = walk_expected[rnd.randrange(walk_expected.shape[0])]
-                            self.koho[0].update_closest_neurons(l_obs[obs_ind], push_away=True)
-                            self.koho[1].update_closest_neurons(l_obs[obs_ind])
-
-                    success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
-                    win1, win2 = self.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
-                    #if result are better we keep the network
-                    if win1 > win2:
-                        l_of_res = l_of_res_new
-                        print "better ---"
-                    else:
-                        self.koho = save_koho
-                        print "worst"
-
-    def get_only_mod_chan(self, obs):
-        obs_mod = copy.copy(np.array(obs))
-        #keep only chan that where modulated
-        for c in range(obs_mod.shape[0]):
-            if c not in self.mod_chan:
-                obs_mod[c] = 0
-        return obs_mod
+        if self.save:
+            plt.savefig('tmp_fig/'+'GMM_vs_kohonen' + extra_txt + self.ext_img, dpi=100)
+            plt.savefig('tmp_fig/'+'GMM_vs_kohonen' + extra_txt + '.eps', dpi=100)
+        if not self.show:
+            plt.close()
 
     def show_fig(self):
         plt.show()
-
-class cpp_file_tools:
-    def __init__(self, chan_count, group_chan, ext_img='.png', save=False, show=False):
-         #group channel by
-        self.group_chan = group_chan
-        #result for the state
-        self.stop = [1, 0]
-        self.walk = [0, 1]
-        self.default_res = [0, 0]
-        self.ext_img = ext_img
-        self.save = save
-        self.show = show
-        #params for file converter
-        self.first_chan = 7
-        self.chan_count = chan_count

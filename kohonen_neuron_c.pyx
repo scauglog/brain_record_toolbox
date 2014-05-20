@@ -245,7 +245,7 @@ cdef class Kohonen:
     def group_neurons(self, double dist_threshold):
         self.groups = []
         list_n = copy.copy(self.good_neurons)
-        cpdef double dist_n1_gpe, dist_n2_gpe
+        cdef double dist_n1_gpe, dist_n2_gpe
         while not <int> len(list_n) < 2:
             #search the most close neurons in the list
             n1, n2 = self.find_closest_neurons(list_n)

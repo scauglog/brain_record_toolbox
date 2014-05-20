@@ -53,9 +53,9 @@ def train3(files, rat, date, my_bsc_RL, my_bsc_no_RL, my_cft, min_obs, obs_to_ad
             if new_date:
                 new_date = False
                 try:
-                    l_obs_koho = my_cft.obs_classify_mod_chan(l_obs, l_res, l_of_res[my_bsc_RL.name], my_bsc_RL.mod_chan, obs_to_add)
+                    l_obs_koho = my_cft.obs_classify_mixed_res(l_obs, l_res, l_of_res[my_bsc_RL.name], obs_to_add)
                     my_bsc_RL.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
-                    l_obs_koho = my_cft.obs_classify_mod_chan(l_obs, l_res, l_of_res2[my_bsc_no_RL.name], my_bsc_no_RL.mod_chan, obs_to_add)
+                    l_obs_koho = my_cft.obs_classify_mixed_res(l_obs, l_res, l_of_res2[my_bsc_no_RL.name], obs_to_add)
                     my_bsc_no_RL.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
                 except ValueError:
                     print 'go to the next trial'
@@ -158,7 +158,7 @@ verbose = False
 number_of_chan = 128
 group_chan_by = 4
 my_bsc_RL = bsc.brain_state_calculate(number_of_chan/group_chan_by, 'koho_RL')
-my_cft = my_bsc_RL.build_cpp_file_tools(number_of_chan, group_chan_by)
+my_cft = bsc.cpp_file_tools(number_of_chan, group_chan_by, ext_img, save, show)
 my_bsc_no_RL = bsc.brain_state_calculate(number_of_chan/group_chan_by, 'koho')
 #number of obs for stop and start we should have to train the network with kohonen
 min_obs_train = 10

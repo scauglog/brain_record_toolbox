@@ -55,9 +55,6 @@ class brain_state_calculate:
         self.verbose = True
         self.name = name
 
-    def build_cpp_file_tools(self, chan_count, group_chan):
-        return cpp_file_tools(chan_count, group_chan, self.ext_img, self.save, self.show)
-
     def build_networks(self):
         #build the network
         koho_stop = kn.Kohonen(self.koho_row, self.koho_col, self.weight_count, self.max_weight, self.alpha, self.neighbor, self.min_win, self.ext_img, self.save, self.show, rnd.random())
@@ -297,8 +294,8 @@ class brain_state_calculate:
         if with_RL:
             save_koho = copy.copy(self.koho)
         success, l_of_res = self.test(l_obs, l_res, on_modulate_chan=False)
-
-        l_obs_koho = cft.obs_classify_mod_chan(l_obs, l_res, l_of_res[self.name], self.mod_chan, obs_to_add)
+        success, l_of_res_classify = self.test(l_obs, l_res, on_modulate_chan=True)
+        l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res_classify[self.name], obs_to_add)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, 0.1, 14, 0.99)
 
         # success, l_of_res = self.test(l_obs, l_res, test_mod=False)
@@ -366,7 +363,7 @@ class brain_state_calculate:
 
         if new_day:
             success, l_of_res = self.test(all_obs, all_res)
-            l_obs_koho = cft.obs_classify_mod_chan(all_obs, all_res, l_of_res[self.name], self.mod_chan, 0)
+            l_obs_koho = cft.obs_classify_mixed_res(all_obs, all_res, l_of_res[self.name], 0)
             self.simulated_annealing(all_obs, l_obs_koho, all_res, 0.1, 14, 0.99)
 
         self.train_nets(self, all_obs, all_res, cft, with_RL=True, obs_to_add=0)
@@ -544,7 +541,7 @@ class cpp_file_tools:
                 l_obs_stop.append(l_obs[i])
             elif l_calc_res[i] == self.walk.index(1):
                 l_obs_walk.append(l_obs[i])
-                #before walk
+                #when state change
                 if l_calc_res[i] != l_calc_res[i+1]:
                     if obs_to_add > 0:
                         for n in range(i-obs_to_add, i):
@@ -560,6 +557,7 @@ class cpp_file_tools:
                         for n in range(i-abs(obs_to_add), i):
                             if 0 < n < len(l_obs):
                                 obs_to_remove.append(l_obs[n])
+        #remove obs when obs_to_add <0
         if len(obs_to_remove) > 0:
             tmp_l = []
             for obs in l_obs_walk:
@@ -570,7 +568,6 @@ class cpp_file_tools:
                         break
                 if to_add:
                     tmp_l.append(obs)
-            #l_obs_walk[:] = [obs for obs in l_obs_walk if obs not in obs_to_remove]
             l_obs_walk = tmp_l
         return [l_obs_stop, l_obs_walk]
 
@@ -592,6 +589,7 @@ class cpp_file_tools:
                 if len(net.groups) == 2:
                     break
                 elif n > 4:
+                    #when we still don't have a valid number of class after many trials we raise an exception
                     raise Exception("error the network can't converge for that number of class")
                 else:
                     print len(net.groups), len(net.good_neurons)
@@ -627,26 +625,9 @@ class cpp_file_tools:
             else:
                 return [[], []]
 
-    def obs_classify_mod_chan(self, l_obs, l_res, l_calc_res, mod_chan, obs_to_add=0):
-        #test the net with only the chan that where modulated before
-        #then classify using mixed res
-        if len(mod_chan) == 0:
-            print "no previous modulated chan, so learn using kohonen"
-            return self.obs_classify_kohonen(l_obs)
-
-        obs_stop = []
-        obs_walk = []
-        for i in range(len(l_obs)):
-            if l_res[i] == self.stop:
-                obs_stop.append(l_obs[i])
-            elif l_calc_res[i] == self.walk.index(1) and l_res[i] == self.walk:
-                obs_walk.append(l_obs[i])
-                self.add_extra_obs(l_obs, l_res, obs_to_add, l_calc_res, i, self.walk, obs_walk)
-        return [obs_stop, obs_walk]
-
     @staticmethod
     def add_extra_obs(l_obs, l_res, obs_to_add, calculate_res, i, res_expected, l_obs_state):
-        #when the brain state change we add value before or after to the observed state
+        #when the brain state change we add value before or after the observed state
         obs_to_remove=[]
         if 1 < i < len(l_res)-1:
             if calculate_res[i-1] != calculate_res[i]:

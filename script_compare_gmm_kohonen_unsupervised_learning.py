@@ -14,9 +14,8 @@ show = False
 files0423 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 
 my_bsc = bsc.brain_state_calculate(32, 'koho_RL', ext_img, save, show)
-my_cft = my_bsc.build_cpp_file_tools(32, 1)
+my_cft = bsc.cpp_file_tools(32, 1, ext_img, save, show)
 my_bsc2 = bsc.brain_state_calculate(32, 'koho', ext_img, save, show)
-my_bsc2.build_cpp_file_tools(32, 1)
 
 ##build one koho network and class obs with unsupervised learning
 l_res, l_obs = my_bsc.cft.convert_cpp_file(dir_name, 't_0423', files0423[0:5], False)

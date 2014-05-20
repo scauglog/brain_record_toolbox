@@ -107,7 +107,7 @@ for i in range(5):
 #file to use for the network building
 first_train = 3
 my_bsc = bsc.brain_state_calculate(32, 'koho', ext_img, save, show)
-my_cft=my_bsc.build_cpp_file_tools(32, 1)
+my_cft = bsc.cpp_file_tools(32, 1, ext_img, save, show)
 if hist:
     my_bsc.weight_count = 9
     my_bsc.A = np.array([[0.90, 0.10], [0.10, 0.90]])

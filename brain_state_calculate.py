@@ -356,6 +356,25 @@ class brain_state_calculate:
                         self.koho = save_koho
                         print "worst"
 
+    def train_on_files(self, paths, cft, is_healthy=False, new_day=True, train_mod_chan=True):
+        all_obs = []
+        all_res = []
+        for filename in paths:
+            l_res, l_obs = cft.convert_one_cpp_file(filename, is_healthy=is_healthy, cut_after_cue=True, init_in_walk=False)
+            all_obs += l_obs
+            all_res += l_res
+
+        if new_day:
+            success, l_of_res = self.test(all_obs, all_res)
+            l_obs_koho = cft.obs_classify_mod_chan(all_obs, all_res, l_of_res[self.name], self.mod_chan, 0)
+            self.simulated_annealing(all_obs, l_obs_koho, all_res, 0.1, 14, 0.99)
+
+        self.train_nets(self, all_obs, all_res, cft, with_RL=True, obs_to_add=0)
+
+        if train_mod_chan:
+            self.mod_chan = cft.get_mod_chan(all_obs)
+
+
 class cpp_file_tools:
     def __init__(self, chan_count, group_chan, ext_img='.png', save=False, show=False):
          #group channel by
@@ -370,8 +389,7 @@ class cpp_file_tools:
         self.first_chan = 7
         self.chan_count = chan_count
 
-    def convert_cpp_file(self, dir_name, date, files, is_healthy=False, file_core_name='healthyOutput_', cut_after_cue=False, init_in_walk=True):
-        #convert cpp file to list of obs and list of res
+    def convert_one_cpp_file(self, filename, is_healthy=False, cut_after_cue=False, init_in_walk=True):
         l_obs = []
         l_res = []
         #read 'howto file reading.txt' to understand
@@ -391,43 +409,48 @@ class cpp_file_tools:
             stop = ['0', '3', '4']
             walk = ['1', '2']
 
+        csvfile = open(filename, 'rb')
+        file = csv.reader(csvfile, delimiter=' ', quotechar='"')
+        prevState=stop[0]
+        #grab expected result in file and convert, grab input data
+        for row in file:
+            if len(row) > self.first_chan and row[0] != '0':
+                #if rat is healthy walk state are in col 4 otherwise in col 6 see 'howto file reading file'
+                if is_healthy:
+                    ratState = row[3]
+                else:
+                    ratState = row[5]
+
+                #add brain state to l_obs and convert number to float
+                brain_state = self.convert_brain_state(row[self.first_chan:self.chan_count+self.first_chan])
+                #'-1' added to ignore time where the rat is in the air added by 'add_ground_truth'
+                if row[5] != '-1':
+                    if row[5] in ['0', '3', '4'] and prevState in walk and cut_after_cue:
+                            break
+
+                    if ratState in stop:
+                        #we don't take after the cue cause the rat reach the target
+                        l_res.append(self.stop)
+                        l_obs.append(brain_state)
+                    elif ratState in walk:
+                        l_res.append(self.walk)
+                        l_obs.append(brain_state)
+
+                    if row[5] in ['1', '2']:
+                        prevState = walk[0]
+
+        return l_res, l_obs
+
+    def convert_cpp_file(self, dir_name, date, files, is_healthy=False, file_core_name='healthyOutput_', cut_after_cue=False, init_in_walk=True):
+        #convert cpp file to list of obs and list of res
+        l_obs = []
+        l_res = []
+        #read 'howto file reading.txt' to understand
         for f in files:
             filename = dir_name+date+file_core_name+str(f)+'.txt'
-            csvfile = open(filename, 'rb')
-            file = csv.reader(csvfile, delimiter=' ', quotechar='"')
-            prevState=stop[0]
-            #grab expected result in file and convert, grab input data
-            for row in file:
-                if len(row) > self.first_chan and row[0] != '0':
-                    #if rat is healthy walk state are in col 4 otherwise in col 6 see 'howto file reading file'
-                    if is_healthy:
-                        ratState = row[3]
-                    else:
-                        ratState = row[5]
-
-                    #add brain state to l_obs and convert number to float
-                    brain_state = self.convert_brain_state(row[self.first_chan:self.chan_count+self.first_chan])
-                    #'-1' added to ignore time where the rat is in the air added by 'add_ground_truth'
-                    if row[5] != '-1':
-                        if row[5] in ['0', '3', '4']and prevState in walk and cut_after_cue:
-                                break
-
-                        if ratState in stop:
-                            #we don't take after the cue cause the rat reach the target
-                            l_res.append(self.stop)
-                            l_obs.append(brain_state)
-                        elif ratState in walk:
-                            l_res.append(self.walk)
-                            l_obs.append(brain_state)
-
-                        if row[5] in ['1', '2']:
-                            prevState = walk[0]
-
-            # derivative of l_obs
-            # l_obs_d = []
-            # l_obs_d.append([])
-            # for i in range(1, len(l_obs)):
-            #     l_obs_d.append(np.array(l_obs[i])-np.array(l_obs[i-1]))
+            l_res_tmp, l_obs_tmp = self.convert_one_cpp_file(filename, is_healthy, cut_after_cue, init_in_walk)
+            l_obs += l_obs_tmp
+            l_res += l_res_tmp
         return l_res, l_obs
 
     def convert_brain_state(self, obs):

@@ -97,27 +97,28 @@ class brain_state_calculate:
             obs = self.get_only_mod_chan(obs)
         #test one obs
         dist_res = []
+        dist_res = np.arange(0, len(self.koho), 1.0)
         best_ns = []
         res = copy.copy(self.default_res)
 
         #find the best distance of the obs to each network
-        for k in self.koho:
-            dist_res.append(k.find_mean_best_dist(obs, self.dist_count))
+        for k in range(len(self.koho)):
+            dist_res[k] = self.koho[k].find_mean_best_dist(obs, self.dist_count)
             #we add extra neurons to best_ns in order to remove null probability
-            best_ns.append(k.find_best_X_neurons(obs, self.dist_count+self.dist_count))
-        self.raw_res=np.array(dist_res).argmin()
+            best_ns += self.koho[k].find_best_X_neurons(obs, self.dist_count+self.dist_count)
+        self.raw_res = dist_res.argmin()
         if self.HMM:
             #flatten list
-            best_ns = [item for sublist in best_ns for item in sublist]
+            #best_ns = [item for sublist in best_ns for item in sublist]
 
             prob_res = self.compute_network_accuracy(best_ns, dist_res, obs)
 
             #compute result with HMM
-            P = []
-            for k in range(prob_res.shape[0]):
-                P.append(self.prevP.T.dot(self.A[:, k])*prob_res[k])
+            P = np.arange(0, prob_res.shape[0], 1.0)
+            for i in range(prob_res.shape[0]):
+                P[i]=self.prevP.T.dot(self.A[:, i])*prob_res[i]
             #repair sum(P) == 1
-            P = np.array(P).T/sum(P)
+            P = P.T/P.sum()
 
             #transform in readable result
             rank = P.argmax()
@@ -127,7 +128,7 @@ class brain_state_calculate:
             self.prevP = copy.copy(P.T)
         else:
             #transform in readable result
-            rank = np.array(dist_res).argmin()
+            rank = dist_res.argmin()
             res[rank] = 1
 
         #use history to smooth change
@@ -166,7 +167,7 @@ class brain_state_calculate:
             return 0, {}
 
     def get_only_mod_chan(self, obs):
-        obs_mod = copy.copy(np.array(obs))
+        obs_mod = copy.copy(np.array(map(float, obs)))
         #keep only chan that where modulated
         for c in range(obs_mod.shape[0]):
             if c not in self.mod_chan:
@@ -199,7 +200,7 @@ class brain_state_calculate:
                     l_dist.append(n.calc_error(obs))
                 dist_comb.append(np.array(l_dist).mean())
 
-        prob_res = []
+        prob_res = np.arange(0,len(self.koho),1.0)
         #sort each dist for combination and find where the result of each network is in the sorted list
         #this give a percentage of accuracy for the network
         dist_comb = np.array(sorted(dist_comb, reverse=True))
@@ -207,7 +208,7 @@ class brain_state_calculate:
             prob = abs(dist_comb-dist_res[k]).argmin()/float(len(dist_comb))
             if prob == 0.0:
                 prob = 0.01
-            prob_res.append(prob)
+            prob_res[k] = prob
 
         return np.array(prob_res)
 
@@ -452,9 +453,7 @@ class cpp_file_tools:
 
     def convert_brain_state(self, obs):
         #convert what we read in the file to correct brain state
-        obs_converted = np.array(range(len(obs)/self.group_chan))
-        #convert obs from string to float
-        obs_converted = map(float, obs_converted)
+        obs_converted = np.arange(0,len(obs)/self.group_chan,1.0)
         #sum chan X by X (X=self.group_chan)
         res = 0.0
         for i in range(len(obs)):
@@ -462,7 +461,7 @@ class cpp_file_tools:
                 obs_converted[i/self.group_chan] = res
                 res = 0.0
             res += float(obs[i])
-        return np.array(obs_converted)
+        return obs_converted
 
     def get_mod_chan(self, l_obs):
         #return the chan where a neuron is active (modulated chan)
@@ -666,10 +665,11 @@ class cpp_file_tools:
         for i in range(len(l_res)):
             #when we are at the end of the walk or cue change and we walk
             if (l_res[i] != l_res[i-1] or l_expected_res[i] != l_expected_res[i-1]) and l_res[i] == 0:
-                if l_expected_res[i-1] == 0:
-                    walk_before_cue.append(current_walk)
-                else:
-                    walk_after_cue.append(current_walk)
+                if current_walk != 0:
+                    if l_expected_res[i-1] == 0:
+                        walk_before_cue.append(current_walk)
+                    else:
+                        walk_after_cue.append(current_walk)
                 current_walk = 0
 
             if l_res[i] == 1:
@@ -814,10 +814,9 @@ class cpp_file_tools:
     def success_rate(self, l_res, l_expected_res):
         block_length = 0.1
         min_walk = 3/block_length
-
         w_before_cue, w_after_cue = self.class_result(l_res, l_expected_res)
         if w_before_cue.shape[0] == 0:
-            return min(1, w_after_cue.sum()/float(min_walk))
+            return min(1.0, w_after_cue.sum()/float(min_walk))
         else:
             return 0
 

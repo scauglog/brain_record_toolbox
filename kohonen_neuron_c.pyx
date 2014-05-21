@@ -1,52 +1,17 @@
+#!python
+#cython: boundscheck=False
+#cython: wraparound=False
+
 import random as rnd
 import math
 import matplotlib.pyplot as plt
 import numpy as np
 import copy
-cimport numpy as np
-DTYPE = np.double
-ctypedef np.double_t DTYPE_t
+import csv
+from itertools import combinations
+import pickle
+from scipy.stats.mstats import mquantiles
 
-cdef class Neurone:
-    cdef public int weight_count, col, row, win_count
-    cdef public np.ndarray weights
-    def __init__(self,int weight_count, double max_rnd, int col=-1,int row=-1, seed=42):
-        rnd.seed(seed)
-        self.weights = np.array(map(float,range(weight_count)))
-        self.weight_count = weight_count
-        self.col = col
-        self.row = row
-        #number of time a neuron win, used for weighted mean when group neurons
-        self.win_count = 0
-        for i in range(self.weight_count):
-            self.weights[i]=<double>rnd.uniform(-max_rnd, max_rnd)
-
-    #inside the class definition
-    def __reduce__(self):
-        return (rebuild_neuron, (self.weights, self.weight_count, self.col, self.row, self.win_count))
-
-    cpdef double calc_error(self, np.ndarray[DTYPE_t, ndim=1] obs):
-        cdef double error_sum = 0.0
-        cdef int i
-        for i in range(<int> self.weight_count):
-            error_sum += (<double>self.weights[i] - <double>obs[i]) ** 2
-        return <double> math.sqrt(error_sum)
-
-    def change_weights(self,double dist, np.ndarray[DTYPE_t, ndim=1] obs, double alpha):
-        cdef int i
-        for i in range(<int> self.weight_count):
-            #if the neuron is not the best neuron dist > 1, dist is the neighborhood distance
-            self.weights[i] -= alpha * ((<double> self.weights[i] - <double> obs[i]) * 1 / dist)
-
-    cpdef double interneuron_dist(self, n2):
-        return <double> self.weights_dist(n2.weights)
-
-    cpdef double weights_dist(self, np.ndarray[DTYPE_t, ndim=1] w2):
-        cdef double dist = 0
-        cdef int i
-        for i in range(self.weight_count):
-            dist += (<double> self.weights[i] - <double> w2[i]) ** 2
-        return <double> math.sqrt(dist)
 
 #standalone function
 def rebuild_neuron(weights, weight_count, col, row, win_count):
@@ -66,17 +31,59 @@ def rebuild_kohonen(row, col, neighbor, alpha, min_win, network, good_neurons, g
     return p
 
 def rebuild_group(neurons, template, color, number, spikes):
-        p=Group_neuron(neurons[0], number)
-        p.neurons=neurons
-        p.template=template
-        p.color=color
-        p.spikes=spikes
-        return p
+    p=Group_neuron(neurons[0], number)
+    p.neurons=neurons
+    p.template=template
+    p.color=color
+    p.spikes=spikes
+    return p
+
+cdef class Neurone:
+    #cdef public int weight_count, col, row, win_count
+    #cdef public np.ndarray weights
+    def __init__(self,int weight_count, double max_rnd, int col=-1,int row=-1, seed=42):
+        rnd.seed(seed)
+        self.weights = np.array(map(float,range(weight_count)))
+        self.weight_count = weight_count
+        self.col = col
+        self.row = row
+        #number of time a neuron win, used for weighted mean when group neurons
+        self.win_count = 0
+        cdef int i
+        for i in range(<int>self.weight_count):
+            self.weights[i]=<double>rnd.uniform(-max_rnd, max_rnd)
+
+    #inside the class definition
+    def __reduce__(self):
+        return (rebuild_neuron, (self.weights, self.weight_count, self.col, self.row, self.win_count))
+
+    cpdef double calc_error(self, np.ndarray[DTYPE_t, ndim=1] obs):
+        cdef double error_sum = 0.0
+        cdef int i
+        for i in range(<int> self.weight_count):
+            error_sum += (<double>self.weights[i] - <double>obs[i]) ** 2
+        return <double> math.sqrt(error_sum)
+
+    def change_weights(self,double dist, np.ndarray[DTYPE_t, ndim=1] obs, double alpha):
+        cdef int i
+        for i in range(<int> self.weight_count):
+            #if the neuron is not the best neuron dist > 1, dist is the neighborhood distance
+            self.weights[i] -= alpha * ((<double> self.weights[i] - <double> obs[i]) * 1 / dist)
+
+    cpdef double interneuron_dist(self,Neurone n2):
+        return <double> self.weights_dist(n2.weights)
+
+    cpdef double weights_dist(self, np.ndarray[DTYPE_t, ndim=1] w2):
+        cdef double dist = 0
+        cdef int i
+        for i in range(self.weight_count):
+            dist += (<double> self.weights[i] - <double> w2[i]) ** 2
+        return <double> math.sqrt(dist)
 
 cdef class Kohonen:
-    cdef public int row, col, neighbor, min_win
-    cdef public double alpha
-    cdef public object network, good_neurons, groups, img_ext, show, save
+    #cdef public int row, col, neighbor, min_win
+    #cdef public double alpha
+    #cdef public object network, good_neurons, groups, img_ext, show, save
     def __init__(self, int row, int col, int weight_count, int max_weight, double alpha, int neighbor, int min_win, ext_img, save, show, seed=42):
         self.row = row
         self.col = col
@@ -118,7 +125,7 @@ cdef class Kohonen:
                         dist = 1.0 + <double> abs(best_c - c) + <double> abs(best_r - r)
                     else:
                         dist = 1.0
-                    neur = self.network[c][r]
+                    neur = <Neurone>self.network[c][r]
                     if push_away:
                         neur.change_weights(dist, obs, -self.alpha)
                     else:
@@ -134,7 +141,7 @@ cdef class Kohonen:
             win_count.append([])
             for r in range(self.row):
                 win_count[c].append(0)
-                neur = self.network[c][r]
+                neur = <Neurone>self.network[c][r]
                 neur.win_count = 0
         self.good_neurons = []
         #for each obs find the best neurons and update his win count
@@ -147,47 +154,51 @@ cdef class Kohonen:
 
     #return the best neurons for the obs
     cpdef Neurone find_best_neuron(self, np.ndarray[DTYPE_t, ndim=1] obs):
-        cdef Neurone best_n = self.network[0][0]
+        cdef Neurone best_n = <Neurone>self.network[0][0]
         cdef double minerror = best_n.calc_error(obs)
         cdef int c,r
         cdef double error
         cdef Neurone n
         for c in range(self.col):
             for r in range(self.row):
-                n = self.network[c][r]
+                n = <Neurone>self.network[c][r]
                 error = n.calc_error(obs)
                 if error < minerror:
                     minerror = error
                     best_n = n
         return best_n
 
-    def find_mean_best_dist(self, np.ndarray[DTYPE_t, ndim=1] obs, int elements_range):
-        best_dist = []
-        cdef int c,r
+    cpdef double find_mean_best_dist(self, np.ndarray[DTYPE_t, ndim=1] obs, int elements_range):
+        cdef np.ndarray[DTYPE_t, ndim=1] best_dist
+        cdef int c, r, cpt
+        cdef Neurone n
+        best_dist=np.empty(self.col*self.row)
+        cpt = 0
         for c in range(self.col):
             for r in range(self.row):
-                n = self.network[c][r]
-                best_dist.append(<double>n.calc_error(obs))
+                n = <Neurone>self.network[c][r]
+                best_dist[cpt]=<double>n.calc_error(obs)
+                cpt+=1
         best_dist.sort()
 
         if <int> len(best_dist) > elements_range:
             best_dist = best_dist[0:elements_range]
-        cdef double mean = <double> reduce(lambda x, y: x + y, best_dist)/float(len(best_dist))
+        cdef double mean = <double> best_dist.mean()
         return mean
 
     def find_best_X_neurons(self, obs, int elements_range):
         best_n = []
         best_d = []
-        cdef int c,r
+        cdef int c,r,arg_max_d
         cdef double d
         for c in range(self.col):
             for r in range(self.row):
-                n = self.network[c][r]
+                n = <Neurone>self.network[c][r]
                 d = <double>n.calc_error(obs)
                 best_n.append(n)
                 best_d.append(d)
                 if <int> len(best_d) > elements_range:
-                    arg_max_d = best_d.index(max(best_d))
+                    arg_max_d = <int>best_d.index(max(best_d))
                     del best_n[arg_max_d]
                     del best_d[arg_max_d]
         return best_n
@@ -219,15 +230,15 @@ cdef class Kohonen:
             for r in range(self.row):
                 if 0 < c < (self.col - 1) and (self.row < 3):
                     if (dens[c][r] < dens[c - 1][r]) and (dens[c][r] < dens[c + 1][r]):
-                        self.groups.append(Group_neuron(self.network[c][r], len(self.groups)))
+                        self.groups.append(Group_neuron(<Neurone>self.network[c][r], <int>len(self.groups)))
 
                 if 0 < r < (self.row - 1) and (self.col < 3):
                     if (dens[c][r] < dens[c][r - 1]) and (dens[c][r] < dens[c][r + 1]):
-                        self.groups.append(Group_neuron(self.network[c][r], len(self.groups)))
+                        self.groups.append(Group_neuron(<Neurone>self.network[c][r], <int>len(self.groups)))
 
                 if 0 < r < (self.row - 1) and 0 < c < (self.col - 1) and self.col > 2 and self.row > 2:
                     if (dens[c][r] < dens[c - 1][r]) and (dens[c][r] < dens[c + 1][r]) and (dens[c][r] < dens[c][r - 1]) and (dens[c][r] < dens[c][r + 1]):
-                        self.groups.append(Group_neuron(self.network[c][r], len(self.groups)))
+                        self.groups.append(Group_neuron(<Neurone>self.network[c][r], <int>len(self.groups)))
 
     #return neurons who win more than threshold (min_win)
     def evaluate_neurons(self, obs_list):
@@ -236,7 +247,7 @@ cdef class Kohonen:
         cdef Neurone neur
         for c in range(self.col):
             for r in range(self.row):
-                neur = self.network[c][r]
+                neur = <Neurone>self.network[c][r]
                 if <int> neur.win_count > <int> self.min_win:
                     self.good_neurons.append(neur)
         return self.good_neurons
@@ -272,7 +283,7 @@ cdef class Kohonen:
             print 'good_neurons is empty. all neurons are considered'
             for c in range(self.col):
                 for r in range(self.row):
-                    n = copy.copy(self.network[c][r])
+                    n = copy.copy(<Neurone>self.network[c][r])
                     self.groups.append(Group_neuron(<Neurone> n, <int> len(self.groups)))
         else:
             list_n = self.good_neurons
@@ -323,7 +334,7 @@ cdef class Kohonen:
         cdef double best_dist_neuron_gpe = 0
         cdef int best_gpe_neuron = 0
         cdef int gpe
-        for gpe in range(len(self.groups)):
+        for gpe in range(<int>len(self.groups)):
             dist_neuron_gpe = neuron.weights_dist(self.groups[gpe].template)
             if first:
                 best_dist_neuron_gpe = dist_neuron_gpe
@@ -340,14 +351,14 @@ cdef class Kohonen:
     def classify_neuron(self, list_n, Neurone neuron, double dist_neuron_gpe, int best_gpe_neuron, double dist_threshold):
         if <int>len(self.groups) == 0:
             #if no group create a new one
-            self.groups.append(Group_neuron(neuron, len(self.groups)))
+            self.groups.append(Group_neuron(neuron, <int>len(self.groups)))
         else:
             #if neuron is close to one group add it to this group else create a new group
             if dist_neuron_gpe < dist_threshold:
                 self.groups[best_gpe_neuron].add_neuron(neuron)
                 list_n.remove(neuron)
             else:
-                self.groups.append(Group_neuron(neuron, len(self.groups)))
+                self.groups.append(Group_neuron(neuron, <int>len(self.groups)))
                 list_n.remove(neuron)
 
     #plot weight vector of the network in the same graph
@@ -357,7 +368,7 @@ cdef class Kohonen:
         for c in range(self.col):
             for r in range(self.row):
                 w = self.network[c][r].weights
-                plt.plot(range(len(w)), w)
+                plt.plot(range(w.shape[0]), w)
         if self.save:
             plt.savefig('all_neurons_weights' + extra_text + self.img_ext, bbox_inches='tight')
         if not self.show:
@@ -370,7 +381,7 @@ cdef class Kohonen:
             for r in range(self.row):
                 w = self.network[c][r].weights
                 plt.subplot(self.col, self.row, cpt)
-                plt.plot(range(len(w)), w)
+                plt.plot(range(w.shape[0]), w)
                 cpt += 1
         if self.save:
             plt.savefig('all_neurons_weights_a' + extra_text + self.img_ext, bbox_inches='tight')
@@ -412,7 +423,7 @@ cdef class Kohonen:
         plt.suptitle('best neurons weights' + extra_text)
         for n in self.good_neurons:
             w = n.weights
-            plt.plot(range(len(w)), w)
+            plt.plot(range(w.shape[0]), w)
         if self.save:
             plt.savefig('best_neurons_weights' + extra_text + self.img_ext, bbox_inches='tight')
         if not self.show:
@@ -425,7 +436,7 @@ cdef class Kohonen:
             plt.suptitle('group weights' + extra_text)
             for gpe in self.groups:
                 w = gpe.template
-                plt.plot(range(len(w)), w, color=gpe.color)
+                plt.plot(range(w.shape[0]), w, color=gpe.color)
             if self.save:
                 plt.savefig('group_weights' + extra_text + self.img_ext, bbox_inches='tight')
             if not self.show:
@@ -508,9 +519,9 @@ cdef class Kohonen:
 
 
 cdef class Group_neuron:
-    cdef public int number
-    cdef public np.ndarray template
-    cdef public object plot_color, neurons, color, spikes
+    #cdef public int number
+    #cdef public np.ndarray template
+    #cdef public object plot_color, neurons, color, spikes
     def __init__(self, Neurone neuron, int gpe_count):
         plot_color = ['r', 'g', 'b', 'm', 'c', 'y']
         self.neurons = [neuron]
@@ -554,10 +565,11 @@ cdef class Group_neuron:
         return <double> math.sqrt(dist)
 
     cpdef double min_dist(self, np.ndarray[DTYPE_t, ndim=1] val):
-        cdef double best_dist = self.neurons[0].weights_dist(val)
+        cdef double best_dist = <double>self.neurons[0].weights_dist(val)
         cdef double dist
+        cdef Neurone n
         for n in self.neurons:
-            dist = n.weights_dist(val)
+            dist = <double>n.weights_dist(val)
             if dist < best_dist:
                 best_dist = dist
         return best_dist

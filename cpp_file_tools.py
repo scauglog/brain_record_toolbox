@@ -123,10 +123,10 @@ class cpp_file_tools:
         #sum chan X by X (X=self.group_chan)
         res = 0.0
         for i in range(len(obs)):
+            res += float(obs[i])
             if i % self.group_chan == 0:
                 obs_converted[i/self.group_chan] = res
                 res = 0.0
-            res += float(obs[i])
         return obs_converted
 
     def get_mod_chan(self, l_obs):

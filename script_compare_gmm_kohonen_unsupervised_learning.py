@@ -6,6 +6,8 @@ import numpy as np
 #learning is totally unsupervised
 #####################
 ######  START  ######
+from cpp_file_tools import cpp_file_tools
+
 dir_name = '../RT_classifier/BMIOutputs/0423_r600/'
 save_obj = False
 ext_img = '.png'
@@ -14,7 +16,7 @@ show = False
 files0423 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 
 my_bsc = bsc.brain_state_calculate(32, 'koho_RL', ext_img, save, show)
-my_cft = bsc.cpp_file_tools(32, 1, ext_img, save, show)
+my_cft = cpp_file_tools(32, 1, ext_img, save, show)
 my_bsc2 = bsc.brain_state_calculate(32, 'koho', ext_img, save, show)
 
 ##build one koho network and class obs with unsupervised learning

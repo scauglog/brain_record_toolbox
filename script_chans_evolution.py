@@ -8,6 +8,7 @@ from collections import Counter
 # how many neurons gain ?
 # how many neurons modulate ?
 # how much the fire rate is modulated ?
+from cpp_file_tools import cpp_file_tools
 
 base_dir = '../RT_classifier/BMIOutputs/BMISCIOutputs/'
 files = {'r31':
@@ -41,7 +42,7 @@ files = {'r31':
 
 number_of_chan = 128
 group_chan_by = 1
-my_cft = bsc.cpp_file_tools(number_of_chan, group_chan_by)
+my_cft = cpp_file_tools(number_of_chan, group_chan_by)
 #number of chan after grouping
 number_of_chan /=group_chan_by
 f = open('chan_evo_result.txt', 'w')

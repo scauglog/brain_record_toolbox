@@ -124,7 +124,7 @@ class cpp_file_tools:
         res = 0.0
         for i in range(len(obs)):
             res += float(obs[i])
-            if i % self.group_chan == 0:
+            if (i+1) % self.group_chan == 0:
                 obs_converted[i/self.group_chan] = res
                 res = 0.0
         return obs_converted
@@ -502,7 +502,14 @@ class cpp_file_tools:
                 rest_total += 1
                 if l_res[i] == self.stop_index:
                     rest_success += 1
-        return (walk_success/walk_total+rest_success/rest_total)/2
+        if walk_total > 0 and rest_total > 0:
+            return (walk_success/walk_total+rest_success/rest_total)/2
+        elif walk_total > 0 and rest_total < 0:
+            return walk_success/walk_total
+        elif rest_total > 0 and walk_total < 0:
+            return rest_success/rest_total
+        else:
+            return 0
 
     def plot_result(self, list_of_res, extra_txt='', dir_path=''):
         plt.figure(figsize=(10, 14))

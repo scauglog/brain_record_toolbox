@@ -9,5 +9,6 @@
 *.csv
 *.txt
 *.zip
+*.pyObj
 
 **/.idea/

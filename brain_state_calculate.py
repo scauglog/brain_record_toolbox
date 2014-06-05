@@ -5,13 +5,15 @@ import math
 from itertools import combinations
 import pickle
 from scipy.stats.mstats import mquantiles
+import Tkinter
+import tkFileDialog
 
 import kohonen_neuron_c as kn
 
 
 class brain_state_calculate:
     def __init__(self, weight_count, name='koho', ext_img='.png', save=False, show=False):
-        rnd.seed(42)
+        #rnd.seed(42)
         #result for the state
         self.stop = [1, 0]
         self.default_res = [0, 0]
@@ -22,7 +24,8 @@ class brain_state_calculate:
         #params for Test
         self.test_all = False
         self.combination_to_test = 50
-        self.A = np.array([[0.99, 0.01], [0.01, 0.99]])
+        #self.A = np.array([[0.99, 0.01], [0.01, 0.99]])
+        self.A = np.array([[0.75, 0.25], [0.1, 0.9]])
         #history length should be a prime number
         self.history_length = 1
 
@@ -79,17 +82,61 @@ class brain_state_calculate:
         print path
         pkl_file = open(path, 'rb')
         dict = pickle.load(pkl_file)
+        keys = dict.keys()
         self.koho = dict['networks']
-        self.mod_chan = dict['mod_chan']
+        if 'mod_chan' in keys:
+            self.mod_chan = dict['mod_chan']
+        if 'A' in keys:
+            self.A = dict['A']
+        if 'history_length' in keys:
+            self.history_length = dict['history_length']
+        if 'use_obs_quantile' in keys:
+            self.use_obs_quantile = dict['use_obs_quantile']
+        if 'qVec' in keys:
+            self.qVec = dict['qVec']
+        if 'weight_count' in keys:
+            self.weight_count = dict['weight_count']
+
         print len(self.koho)
+
+    def load_networks_file(self, initdir):
+        root = Tkinter.Tk()
+        root.withdraw()
+        file_path = tkFileDialog.askopenfilename(initialdir=initdir, title="select classifier file",filetypes=[('all files', '.*'), ('classifier', '.pyObj')])
+        if file_path == "":
+            return -1
+        self.load_networks(file_path)
+        return 0
+
+    def save_obj(self, filename):
+        dict = {'networks': self.koho, 'mod_chan': self.mod_chan}
+        dict['A'] = self.A
+        dict['history_length'] = self.history_length
+        dict['use_obs_quantile'] = self.use_obs_quantile
+        dict['qVec'] = self.qVec
+        dict['weight_count'] = self.weight_count
+
+        if self.koho == [] or self.mod_chan == []:
+            return -2
+
+        with open(filename, 'wb') as my_file:
+            my_pickler = pickle.Pickler(my_file)
+            my_pickler.dump(dict)
+        return 0
 
     def save_networks(self, dir_name, date):
         #save networks
         print 'Saving network'
-        dict={'networks': self.koho, 'mod_chan': self.mod_chan}
-        with open(dir_name + 'koho_networks_' + date, 'wb') as my_file:
-            my_pickler = pickle.Pickler(my_file)
-            my_pickler.dump(dict)
+        return self.save_obj(dir_name + 'koho_networks_' + date)
+
+    def save_networks_on_file(self, initdir, date):
+        root = Tkinter.Tk()
+        root.withdraw()
+        file_path = tkFileDialog.asksaveasfilename(initialdir=initdir, title="save as", initialfile="koho_networks_"+date, defaultextension="pyObj")
+        if file_path == "":
+            return -1
+        return self.save_obj(str(file_path))
+
 
     def init_networks(self, files, cft, train_mod_chan=False):
         l_res, l_obs = cft.read_cpp_files(files, is_healthy=False, cut_after_cue=False)
@@ -99,6 +146,16 @@ class brain_state_calculate:
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)
         if train_mod_chan:
             self.mod_chan = cft.get_mod_chan(l_obs)
+
+    def init_networks_on_files(self, initdir, cft, train_mod_chan=False):
+        root = Tkinter.Tk()
+        root.withdraw()
+        file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=initdir, title="select cpp file to initialize the classifier")
+        if file_path == "":
+            return -1
+        files = root.tk.splitlist(file_path)
+        self.init_networks(files, cft, train_mod_chan=train_mod_chan)
+        return 0
 
     def init_test(self):
         #initilise test for live processing
@@ -267,6 +324,7 @@ class brain_state_calculate:
         alpha = alpha_start
         n = 0
         while success <= max_success and n < max_iteration:
+            print success
             koho_cp = copy.copy(self.koho)
             #train each kohonen network
             for i in range(len(koho_cp)):
@@ -369,20 +427,54 @@ class brain_state_calculate:
         if train_mod_chan:
             self.mod_chan = cft.get_mod_chan(l_obs)
 
-    def train_on_files(self, paths, cft, is_healthy=False, new_day=True, obs_to_add=0,with_RL=True, train_mod_chan=True):
-        all_obs = []
-        all_res = []
-        for filename in paths:
-            l_res, l_obs = cft.convert_one_cpp_file(filename, is_healthy=is_healthy, cut_after_cue=True, init_in_walk=False)
-            all_obs += l_obs
-            all_res += l_res
+    def train_on_files(self, initdir, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True):
+        root = Tkinter.Tk()
+        root.withdraw()
+        file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=initdir,  title="select cpp file to train the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
+        if file_path == "":
+            return -1
+
+        paths = root.tk.splitlist(file_path)
+
+        all_res, all_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=True, init_in_walk=False)
 
         if new_day:
             self.train_nets_new_day(all_obs, all_res, cft)
 
-        self.train_nets(self, all_obs, all_res, cft, with_RL=with_RL, obs_to_add=obs_to_add, train_mod_chan=train_mod_chan)
+        self.train_nets(all_obs, all_res, cft, with_RL=with_RL, obs_to_add=obs_to_add, train_mod_chan=train_mod_chan)
+        return 0
+
+    def train_one_file(self, filename, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True):
+        all_res, all_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=True, init_in_walk=False)
+
+        if new_day:
+            self.train_nets_new_day(all_obs, all_res, cft)
+
+        self.train_nets(all_obs, all_res, cft, with_RL=with_RL, obs_to_add=obs_to_add, train_mod_chan=train_mod_chan)
 
     def train_nets_new_day(self, l_obs, l_res, cft):
         success, l_of_res = self.test(l_obs, l_res)
         l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res[self.name+'_raw'], 0)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
+
+    def train_unsupervised_one_file(self, filename, cft, is_healthy=False, obs_to_add=-3):
+        l_res, l_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=True, init_in_walk=True)
+        success, l_of_res = self.test(l_obs, l_res)
+        l_obs_koho = cft.obs_classify_prev_res(l_obs, l_of_res[self.name], obs_to_add=obs_to_add)
+        self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)
+
+    def train_unsupervised_on_files(self, initdir, cft, is_healthy=False, obs_to_add=-3):
+        root = Tkinter.Tk()
+        root.withdraw()
+        file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=initdir,  title="select cpp file to train the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
+        if file_path == "":
+            return -1
+
+        paths = root.tk.splitlist(file_path)
+
+        l_res, l_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=True, init_in_walk=True)
+        success, l_of_res = self.test(l_obs, l_res)
+        l_obs_koho = cft.obs_classify_prev_res(l_obs, l_of_res[self.name], obs_to_add=obs_to_add)
+        self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)
+
+        return 0

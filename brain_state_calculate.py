@@ -79,7 +79,7 @@ class brain_state_calculate:
         self.koho = [koho_stop, koho_walk]
 
     def load_networks(self, path):
-        print path
+        print(path)
         pkl_file = open(path, 'rb')
         dict = pickle.load(pkl_file)
         keys = dict.keys()
@@ -97,7 +97,7 @@ class brain_state_calculate:
         if 'weight_count' in keys:
             self.weight_count = dict['weight_count']
 
-        print len(self.koho)
+        print(len(self.koho))
 
     def load_networks_file(self, initdir):
         root = Tkinter.Tk()
@@ -126,7 +126,7 @@ class brain_state_calculate:
 
     def save_networks(self, dir_name, date):
         #save networks
-        print 'Saving network'
+        print('Saving network')
         return self.save_obj(dir_name + 'koho_networks_' + date)
 
     def save_networks_on_file(self, initdir, date):
@@ -154,15 +154,18 @@ class brain_state_calculate:
         if file_path == "":
             return -1
         files = root.tk.splitlist(file_path)
-        self.init_networks(files, cft, train_mod_chan=train_mod_chan)
+        try:
+            self.init_networks(files, cft, train_mod_chan=train_mod_chan)
+        except Exception:
+            return -2
         return 0
 
-    def init_test(self):
+    def init_test(self, HMM = True):
         #initilise test for live processing
         self.history = np.array([self.stop])
         #matrix which contain the rank of the result
         self.prevP = np.array(self.stop)
-        self.HMM=True
+        self.HMM=HMM
         self.raw_res=0
         self.result=0
 
@@ -235,7 +238,7 @@ class brain_state_calculate:
         if len(l_obs) > 0:
             return good/float(len(l_obs)), results_dict
         else:
-            print ('l_obs is empty')
+            print('l_obs is empty')
             return 0, {}
 
     def get_only_mod_chan(self, obs):
@@ -324,7 +327,7 @@ class brain_state_calculate:
         alpha = alpha_start
         n = 0
         while success <= max_success and n < max_iteration:
-            print success
+            print(success)
             koho_cp = copy.copy(self.koho)
             #train each kohonen network
             for i in range(len(koho_cp)):
@@ -346,7 +349,7 @@ class brain_state_calculate:
             success_cp, lor_trash = self.test(l_obs, l_res, on_modulate_chan=False)
             #if we keep the same network for too long we go there
             if math.exp(-abs(success-success_cp)/(alpha*1.0)) in [0.0, 1.0]:
-                print 'break'
+                print('break')
                 break
             #simulated annealing criterion to keep or not the trained network
             if success < success_cp or rnd.random() < math.exp(-abs(success-success_cp)/(alpha*1.0)):
@@ -389,10 +392,10 @@ class brain_state_calculate:
                 #update l_of_res in case the for loop are not in the else
                 l_of_res = copy.copy(l_of_res_new)
                 save_koho = copy.copy(self.koho)
-                print "better with training --------"
+                print("better with training --------")
             else:
                 self.koho = save_koho
-                print "worst with training"
+                print("worst with training")
 
                 self.koho[1].alpha = 0.1
                 self.koho[0].alpha = 0.1
@@ -419,15 +422,15 @@ class brain_state_calculate:
                     if win1 > win2:
                         l_of_res = copy.copy(l_of_res_new)
                         save_koho = copy.copy(self.koho)
-                        print "better ---"
+                        print("better ---")
                     else:
                         self.koho = save_koho
-                        print "worst"
+                        print("worst")
 
         if train_mod_chan:
             self.mod_chan = cft.get_mod_chan(l_obs)
 
-    def train_on_files(self, initdir, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True):
+    def train_on_files(self, initdir, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True, on_stim=False):
         root = Tkinter.Tk()
         root.withdraw()
         file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=initdir,  title="select cpp file to train the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
@@ -436,7 +439,7 @@ class brain_state_calculate:
 
         paths = root.tk.splitlist(file_path)
 
-        all_res, all_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=True, init_in_walk=False)
+        all_res, all_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=True, init_in_walk=False, on_stim=on_stim)
 
         if new_day:
             self.train_nets_new_day(all_obs, all_res, cft)
@@ -444,8 +447,8 @@ class brain_state_calculate:
         self.train_nets(all_obs, all_res, cft, with_RL=with_RL, obs_to_add=obs_to_add, train_mod_chan=train_mod_chan)
         return 0
 
-    def train_one_file(self, filename, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True):
-        all_res, all_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=True, init_in_walk=False)
+    def train_one_file(self, filename, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True, on_stim=False):
+        all_res, all_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=True, init_in_walk=False, on_stim=on_stim)
 
         if new_day:
             self.train_nets_new_day(all_obs, all_res, cft)
@@ -457,13 +460,13 @@ class brain_state_calculate:
         l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res[self.name+'_raw'], 0)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
 
-    def train_unsupervised_one_file(self, filename, cft, is_healthy=False, obs_to_add=-3):
-        l_res, l_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=True, init_in_walk=True)
+    def train_unsupervised_one_file(self, filename, cft, is_healthy=False, obs_to_add=-3, on_stim=False):
+        l_res, l_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=True, init_in_walk=True, on_stim=on_stim)
         success, l_of_res = self.test(l_obs, l_res)
         l_obs_koho = cft.obs_classify_prev_res(l_obs, l_of_res[self.name], obs_to_add=obs_to_add)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)
 
-    def train_unsupervised_on_files(self, initdir, cft, is_healthy=False, obs_to_add=-3):
+    def train_unsupervised_on_files(self, initdir, cft, is_healthy=False, obs_to_add=-3, on_stim=False):
         root = Tkinter.Tk()
         root.withdraw()
         file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=initdir,  title="select cpp file to train the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
@@ -472,7 +475,7 @@ class brain_state_calculate:
 
         paths = root.tk.splitlist(file_path)
 
-        l_res, l_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=True, init_in_walk=True)
+        l_res, l_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=True, init_in_walk=True, on_stim=on_stim)
         success, l_of_res = self.test(l_obs, l_res)
         l_obs_koho = cft.obs_classify_prev_res(l_obs, l_of_res[self.name], obs_to_add=obs_to_add)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)

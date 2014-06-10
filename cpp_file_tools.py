@@ -37,7 +37,7 @@ class cpp_file_tools:
         self.init_SCI = ['1', '2']
         self.walk_SCI = []
 
-    def convert_one_cpp_file(self, filename, is_healthy=False, cut_after_cue=False, init_in_walk=True):
+    def convert_one_cpp_file(self, filename, is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=False):
         #if is healthy the gnd truth is on col 4 else it's on col 6
         l_obs = []
         l_res = []
@@ -77,8 +77,12 @@ class cpp_file_tools:
                 brain_state = self.convert_brain_state(row[self.first_chan:self.chan_count+self.first_chan])
                 #'-1' added to ignore time where the rat is in the air added by 'add_ground_truth'
                 if row[5] != '-1':
+                    #cut after cue
                     if row[5] in ['0', '3', '4'] and prevState in walk and cut_after_cue:
-                            break
+                        break
+                    #don't select stim off
+                    if row[4] == '0' and on_stim:
+                        continue
 
                     if ratState in stop:
                         #we don't take after the cue cause the rat reach the target
@@ -99,14 +103,14 @@ class cpp_file_tools:
         files = self.convert_to_filename_list(dir_name, date, files, file_core_name)
         return self.read_cpp_files(files, is_healthy, cut_after_cue, init_in_walk)
 
-    def read_cpp_files(self, files, is_healthy=False, cut_after_cue=False, init_in_walk=True):
+    def read_cpp_files(self, files, is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=False):
         #if is healthy gnd truth is on col 4 else on col 6
         #convert cpp file to list of obs and list of res
         l_obs = []
         l_res = []
         #read 'howto file reading.txt' to understand
         for f in files:
-            l_res_tmp, l_obs_tmp = self.convert_one_cpp_file(f, is_healthy, cut_after_cue, init_in_walk)
+            l_res_tmp, l_obs_tmp = self.convert_one_cpp_file(f, is_healthy, cut_after_cue, init_in_walk, on_stim)
             l_obs += l_obs_tmp
             l_res += l_res_tmp
         return l_res, l_obs
@@ -237,7 +241,7 @@ class cpp_file_tools:
         return [l_obs_stop, l_obs_walk]
 
     def obs_classify_kohonen(self, l_obs, acceptance_factor=0.0):
-        print '###### classify with kohonen ######'
+        print('###### classify with kohonen ######')
         while True:
             #while the network don't give 2 classes
             n = 0
@@ -257,7 +261,7 @@ class cpp_file_tools:
                     #when we still don't have a valid number of class after many trials we raise an exception
                     raise Exception("error the network can't converge for that number of class")
                 else:
-                    print len(net.groups), len(net.good_neurons)
+                    print(len(net.groups), len(net.good_neurons))
 
             #test the networks to know which group is stop and which is walk
             dict_res = {}
@@ -270,7 +274,7 @@ class cpp_file_tools:
 
             #stop have more observation than walk
             keys = dict_res.keys()
-            print keys
+            print(keys)
             if len(keys) == 2:
                 if len(dict_res[keys[0]]) > len(dict_res[keys[1]]):
                     stop = keys[0]
@@ -282,7 +286,7 @@ class cpp_file_tools:
                 l_obs_koho = [dict_res[stop], dict_res[walk]]
                 nb_stop = len(dict_res[stop])
                 nb_walk = len(dict_res[walk])
-                print 'nb stop', nb_stop, 'nb_walk', nb_walk, nb_walk/float(nb_stop)
+                print('nb stop', nb_stop, 'nb_walk', nb_walk, nb_walk/float(nb_stop))
                 if acceptance_factor > 0 and (acceptance_factor < nb_walk/float(nb_stop) < 1.5) or (nb_walk + nb_stop < 150 and nb_walk > 20):
                     return l_obs_koho
                 elif acceptance_factor == 0:

@@ -5,7 +5,7 @@ import numpy as np
 from scipy.signal import butter, filtfilt
 from scipy import stats
 import copy
-import kohonen_neuron as nn
+import kohonen_neuron_c as nn
 import random as rnd
 import csv
 
@@ -473,7 +473,7 @@ class Signal_processing:
                     spike_is_step.append(-1)
                     swing_spikes_time.append(spikes_time[i] / fs)
                 else:
-                    print 'error in class_spike_step spike' + spikes_time[i] + ' is not classed'
+                    print('error in class_spike_step spike' + spikes_time[i] + ' is not classed')
         return swing_spikes_time, stance_spikes_time, other_spikes_time, spike_is_step
 
     #plot the spike according to step guessed (-1=swing step phase, 1=stance step phase, 0=no step

@@ -202,7 +202,7 @@ class Kohonen:
     def group_neuron_into_x_class(self, class_count):
         self.groups = []
         if len(self.good_neurons) == 0:
-            print 'good_neurons is empty. all neurons are considered'
+            print('good_neurons is empty. all neurons are considered')
             for c in range(self.col):
                 for r in range(self.row):
                     n = copy.copy(self.network[c][r])

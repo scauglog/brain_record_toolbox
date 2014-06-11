@@ -536,7 +536,17 @@ class cpp_file_tools:
         plt.tight_layout()
 
         if self.save:
-            plt.savefig(dir_path+'' + extra_txt + self.ext_img, dpi=100)
+            plt.savefig(dir_path + 'result' + extra_txt + self.ext_img, dpi=100)
+        if not self.show:
+            plt.close()
+
+    def plot_obs(self, l_obs, l_res, extra_txt='', dir_path=''):
+        plt.figure()
+        obs = np.vstack((np.array(l_obs).T,np.array(l_res).argmax(1).T*4,np.array(l_res).argmax(1).T*4))
+        plt.imshow(obs, interpolation='none')
+
+        if self.save:
+            plt.savefig(dir_path+'obs'+extra_txt+self.ext_img)
         if not self.show:
             plt.close()
 

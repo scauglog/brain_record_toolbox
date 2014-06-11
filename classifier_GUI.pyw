@@ -99,6 +99,24 @@ class Classifier_GUI(Tk):
         self.enable_all_button()
         self.my_cft.show_fig()
 
+    def plot_brain(self):
+        self.disable_all_button()
+
+        file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=self.init_dir,  title="select cpp file to test the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
+        if file_path == "":
+            self.enable_all_button()
+            return -1
+
+        paths = self.splitlist(file_path)
+        for path in paths:
+            l_res, l_obs = self.my_cft.read_cpp_files([path], is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=self.stim_on.get())
+            if len(l_obs) > 0:
+                self.my_cft.plot_obs(l_obs, l_res)
+            else:
+                print "empty file"
+
+        self.enable_all_button()
+        self.my_cft.show_fig()
 
     def train_classifier(self):
         self.disable_all_button()
@@ -239,18 +257,26 @@ class Classifier_GUI(Tk):
         self.b_test = Button(self.f_train_test_button, text="test classifier", command=self.test_classifier, state=DISABLED)
         self.b_test.grid(row=0, column=0, pady=10)
 
+        #plot obs
+        self.b_obs = Button(self.f_train_test_button, text="plot brain", command=self.plot_brain, state=DISABLED)
+        self.b_obs.grid(row=1, column=0, pady=10)
+
         #train button
         self.b_train = Button(self.f_train_test_button, text="train classifier", command=self.train_classifier, state=DISABLED)
-        self.b_train.grid(row=1, column=0, pady=10)
+        self.b_train.grid(row=2, column=0, pady=10)
+
+
 
     def enable_all_button(self):
         self.filemenu.entryconfig(2, state=NORMAL)
         self.b_test['state'] = NORMAL
         self.b_train['state'] = NORMAL
+        self.b_obs['state'] = NORMAL
 
     def disable_all_button(self):
         self.b_test['state'] = DISABLED
         self.b_train['state'] = DISABLED
+        self.b_obs['state'] = DISABLED
 
 app = Classifier_GUI(None)
 app.mainloop()

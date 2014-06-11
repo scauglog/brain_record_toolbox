@@ -35,7 +35,7 @@ class cpp_file_tools:
 
         self.stop_SCI = ['0', '3', '4']
         self.init_SCI = ['1', '2']
-        self.walk_SCI = []
+        self.walk_SCI = ['2']
 
     def convert_one_cpp_file(self, filename, is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=False):
         #if is healthy the gnd truth is on col 4 else it's on col 6

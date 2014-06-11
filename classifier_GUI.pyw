@@ -3,8 +3,21 @@ import cpp_file_tools as cft
 import ast
 import numpy as np
 import datetime
+import sys
 from Tkinter import *
 import tkFileDialog
+
+class IORedirector(object):
+    '''A general class for redirecting I/O to this Text widget.'''
+    def __init__(self, text_area):
+        self.text_area = text_area
+
+    def write(self, str):
+        self.text_area.insert(END, str)
+        # force widget to display the end of the text (follow the input)
+        self.text_area.see(END)
+        # force refresh of the widget to be sure that thing are displayed
+        self.text_area.update_idletasks()
 
 class Classifier_GUI(Tk):
     def __init__(self, parent):
@@ -17,6 +30,7 @@ class Classifier_GUI(Tk):
         self.grid()
         self.init_variable()
         self.init_window()
+        self.redirect_IO()
 
     def init_variable(self):
         self.my_bsc = None
@@ -28,6 +42,10 @@ class Classifier_GUI(Tk):
         self.new_day.set(0)
         self.stim_on = IntVar()
         self.mod_chan_on = IntVar()
+
+    def redirect_IO(self):
+        sys.stdout = IORedirector(self.tb_stdout)
+        sys.stderr = IORedirector(self.tb_stdout)
 
     def quit_app(self):
         self.destroy()
@@ -133,9 +151,14 @@ class Classifier_GUI(Tk):
         self.menubar.add_cascade(label="File", menu=self.filemenu)
         self.config(menu=self.menubar)
 
+        self.f_mainframe = Frame(self, padx=10, pady=10)
+        self.f_mainframe.pack(fill=X)
         #parameter of the classifier
-        self.f_parameter = LabelFrame(self, text="Classifier parameter", padx=10,pady=10)
-        self.f_parameter.pack(fill=X)
+        self.f_parameter = LabelFrame(self.f_mainframe, text="Classifier parameter", padx=10,pady=10)
+        self.f_parameter.grid(row=0,column=0)
+
+        self.tb_stdout = Text(self.f_mainframe)
+        self.tb_stdout.grid(row=0, column=1, rowspan=2)
 
         #group by
         self.t_group_by = Label(self.f_parameter, text="group by")
@@ -154,7 +177,7 @@ class Classifier_GUI(Tk):
         #history length
         self.t_history_length = Label(self.f_parameter, text="history length")
         self.t_history_length.grid(row=3, column=0, sticky=E)
-        self.sb_history_length_param = Spinbox(self.f_parameter, from_=0, to=10, width=5)
+        self.sb_history_length_param = Spinbox(self.f_parameter, from_=1, to=10, width=5)
         self.sb_history_length_param.grid(row=3, column=1, sticky=W)
 
         #HMM
@@ -170,8 +193,8 @@ class Classifier_GUI(Tk):
         self.e_mod_chan_param.grid(row=5, column=1, sticky=W)
 
         #train test
-        self.f_train_test = LabelFrame(self, padx=10, pady=10, text="Test and train parameter")
-        self.f_train_test.pack(fill=X)
+        self.f_train_test = LabelFrame(self.f_mainframe, padx=10, pady=10, text="Test and train parameter")
+        self.f_train_test.grid(row=1,column=0)
 
         #train test parameter
         self.f_train_test_parameter = Frame(self.f_train_test)

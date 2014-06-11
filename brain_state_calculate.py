@@ -167,9 +167,9 @@ class brain_state_calculate:
         self.history = np.array([self.stop])
         #matrix which contain the rank of the result
         self.prevP = np.array(self.stop)
-        self.HMM=HMM
-        self.raw_res=0
-        self.result=0
+        self.HMM = HMM
+        self.raw_res = 0
+        self.result = 0
 
     def test_one_obs(self, obs, on_modulate_chan=True):
         #we transform the obs according to our need
@@ -275,7 +275,7 @@ class brain_state_calculate:
                     l_dist.append(n.calc_error(obs))
                 dist_comb.append(np.array(l_dist).mean())
 
-        prob_res = np.arange(0,len(self.koho),1.0)
+        prob_res = np.arange(0, len(self.koho), 1.0)
         #sort each dist for combination and find where the result of each network is in the sorted list
         #this give a percentage of accuracy for the network
         dist_comb = np.array(sorted(dist_comb, reverse=True))
@@ -370,6 +370,10 @@ class brain_state_calculate:
         if not train_mod_chan:
             self.mod_chan = range(self.weight_count)
 
+        if len(l_obs) <= 0:
+            print "l_obs empty"
+            return -1
+
         #we use l_obs_mod only to classify result
         if with_RL:
             save_koho = copy.copy(self.koho)
@@ -436,6 +440,8 @@ class brain_state_calculate:
         if train_mod_chan:
             self.mod_chan = cft.get_mod_chan(l_obs)
 
+        return 0
+
     def train_on_files(self, initdir, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True, on_stim=False):
         root = Tkinter.Tk()
         root.withdraw()
@@ -445,16 +451,15 @@ class brain_state_calculate:
 
         paths = root.tk.splitlist(file_path)
 
-        all_res, all_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=False, init_in_walk=False, on_stim=on_stim)
+        all_res, all_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
 
         if new_day:
             self.train_nets_new_day(all_obs, all_res, cft)
 
-        self.train_nets(all_obs, all_res, cft, with_RL=with_RL, obs_to_add=obs_to_add, train_mod_chan=train_mod_chan)
-        return 0
+        return self.train_nets(all_obs, all_res, cft, with_RL=with_RL, obs_to_add=obs_to_add, train_mod_chan=train_mod_chan)
 
     def train_one_file(self, filename, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True, on_stim=False):
-        all_res, all_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=False, init_in_walk=False, on_stim=on_stim)
+        all_res, all_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
 
         if new_day:
             self.train_nets_new_day(all_obs, all_res, cft)
@@ -462,12 +467,18 @@ class brain_state_calculate:
         self.train_nets(all_obs, all_res, cft, with_RL=with_RL, obs_to_add=obs_to_add, train_mod_chan=train_mod_chan)
 
     def train_nets_new_day(self, l_obs, l_res, cft):
+        if len(l_obs) <= 0:
+            print "l_obs empty"
+            return -1
         success, l_of_res = self.test(l_obs, l_res)
         l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res[self.name+'_raw'], 0)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
+        return 0
 
     def train_unsupervised_one_file(self, filename, cft, is_healthy=False, obs_to_add=-3, on_stim=False):
         l_res, l_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
+        if l_obs <= 0:
+            print "l_obs empty"
         success, l_of_res = self.test(l_obs, l_res)
         l_obs_koho = cft.obs_classify_prev_res(l_obs, l_of_res[self.name], obs_to_add=obs_to_add)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)
@@ -485,6 +496,10 @@ class brain_state_calculate:
         paths = root.tk.splitlist(file_path)
 
         l_res, l_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
+        if len(l_obs) <= 0:
+            print "l_obs empty"
+            return -2
+
         success, l_of_res = self.test(l_obs, l_res)
         l_obs_koho = cft.obs_classify_prev_res(l_obs, l_of_res[self.name], obs_to_add=obs_to_add)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)

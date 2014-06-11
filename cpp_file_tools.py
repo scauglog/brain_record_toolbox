@@ -515,8 +515,11 @@ class cpp_file_tools:
         else:
             return 0
 
-    def plot_result(self, list_of_res, extra_txt='', dir_path=''):
-        plt.figure(figsize=(10, 14))
+    def plot_result(self, list_of_res, extra_txt='', dir_path='', big_figure=True):
+        if big_figure:
+            plt.figure(figsize=(10, 14))
+        else:
+            plt.figure()
 
         cpt = 0
         color=['b', 'r', 'g', 'm', 'c', 'y', 'k']

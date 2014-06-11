@@ -146,6 +146,8 @@ class brain_state_calculate:
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)
         if train_mod_chan:
             self.mod_chan = cft.get_mod_chan(l_obs)
+        else:
+            self.mod_chan = range(self.weight_count)
 
     def init_networks_on_files(self, initdir, cft, train_mod_chan=False):
         root = Tkinter.Tk()
@@ -206,6 +208,7 @@ class brain_state_calculate:
             #save P.T
             self.prevP = copy.copy(P.T)
         else:
+            print "no HMM"
             #transform in readable result
             rank = dist_res.argmin()
             res[rank] = 1
@@ -364,6 +367,9 @@ class brain_state_calculate:
             n += 1
 
     def train_nets(self, l_obs, l_res, cft, with_RL=True, obs_to_add=0, train_mod_chan=True):
+        if not train_mod_chan:
+            self.mod_chan = range(self.weight_count)
+
         #we use l_obs_mod only to classify result
         if with_RL:
             save_koho = copy.copy(self.koho)
@@ -439,7 +445,7 @@ class brain_state_calculate:
 
         paths = root.tk.splitlist(file_path)
 
-        all_res, all_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=True, init_in_walk=False, on_stim=on_stim)
+        all_res, all_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=False, init_in_walk=False, on_stim=on_stim)
 
         if new_day:
             self.train_nets_new_day(all_obs, all_res, cft)
@@ -448,7 +454,7 @@ class brain_state_calculate:
         return 0
 
     def train_one_file(self, filename, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True, on_stim=False):
-        all_res, all_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=True, init_in_walk=False, on_stim=on_stim)
+        all_res, all_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=False, init_in_walk=False, on_stim=on_stim)
 
         if new_day:
             self.train_nets_new_day(all_obs, all_res, cft)
@@ -461,12 +467,15 @@ class brain_state_calculate:
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
 
     def train_unsupervised_one_file(self, filename, cft, is_healthy=False, obs_to_add=-3, on_stim=False):
-        l_res, l_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=True, init_in_walk=True, on_stim=on_stim)
+        l_res, l_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
         success, l_of_res = self.test(l_obs, l_res)
         l_obs_koho = cft.obs_classify_prev_res(l_obs, l_of_res[self.name], obs_to_add=obs_to_add)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)
 
-    def train_unsupervised_on_files(self, initdir, cft, is_healthy=False, obs_to_add=-3, on_stim=False):
+    def train_unsupervised_on_files(self, initdir, cft, is_healthy=False, obs_to_add=-3,  train_mod_chan=False, on_stim=False):
+        if not train_mod_chan:
+            self.mod_chan = range(self.weight_count)
+
         root = Tkinter.Tk()
         root.withdraw()
         file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=initdir,  title="select cpp file to train the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
@@ -475,9 +484,11 @@ class brain_state_calculate:
 
         paths = root.tk.splitlist(file_path)
 
-        l_res, l_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=True, init_in_walk=True, on_stim=on_stim)
+        l_res, l_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
         success, l_of_res = self.test(l_obs, l_res)
         l_obs_koho = cft.obs_classify_prev_res(l_obs, l_of_res[self.name], obs_to_add=obs_to_add)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)
 
+        if train_mod_chan:
+            self.mod_chan = cft.get_mod_chan(l_obs)
         return 0

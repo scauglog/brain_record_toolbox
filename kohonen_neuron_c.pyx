@@ -280,7 +280,7 @@ cdef class Kohonen:
         cdef Group_neuron g1
         cdef Group_neuron g2
         if <int> len(self.good_neurons) == 0:
-            print('good_neurons is empty. all neurons are considered')
+            print 'good_neurons is empty. all neurons are considered'
             for c in range(self.col):
                 for r in range(self.row):
                     n = copy.copy(<Neurone>self.network[c][r])

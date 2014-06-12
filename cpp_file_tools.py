@@ -2,40 +2,44 @@ import csv
 import numpy as np
 import kohonen_neuron_c as kn
 from matplotlib import pyplot as plt
-
+import settings
 
 class cpp_file_tools:
-    def __init__(self, chan_count, group_chan, ext_img='.png', save=False, show=False):
-        #group channel by
+    def __init__(self, chan_count, group_chan, ext_img='.png', save=False, show=False, settings_path="cppfileSettings.yaml"):
+        self.chan_count = chan_count
         self.group_chan = group_chan
-        #result for the state
-        self.stop = [1, 0]
-        self.stop_index = self.stop.index(1)
-        self.walk = [0, 1]
-        self.walk_index = self.walk.index(1)
         self.ext_img = ext_img
         self.save = save
         self.show = show
+        self.load_settings(settings_path)
+
+    def load_settings(self, settings_path):
+        cftset = settings.Settings(settings_path).get()
+
+        #result for the state
+        self.stop = cftset['stop']
+        self.stop_index = self.stop.index(1)
+        self.walk = cftset['walk']
+        self.walk_index = self.walk.index(1)
         #params for file converter
-        self.first_chan = 7
-        self.chan_count = chan_count
+        self.first_chan = cftset['first_chan']
 
         #kohonen classifier parameter
-        self.kc_col = 12
-        self.kc_row = 7
-        self.kc_max_weight = 5
-        self.kc_alpha = 0.1
-        self.kc_neighbor = 3
-        self.kc_min_win = 2
+        self.kc_col = cftset['kc_col']
+        self.kc_row = cftset['kc_row']
+        self.kc_max_weight = cftset['kc_max_weight']
+        self.kc_alpha = cftset['kc_alpha']
+        self.kc_neighbor = cftset['kc_neighbor']
+        self.kc_min_win = cftset['kc_min_win']
 
         #file convert
-        self.stop_healthy = ['1', '-4', '0']
-        self.init_healthy = ['2']
-        self.walk_healthy = ['-2']
+        self.stop_healthy = cftset['stop_healthy']
+        self.init_healthy = cftset['init_healthy']
+        self.walk_healthy = cftset['walk_healthy']
 
-        self.stop_SCI = ['0', '3', '4']
-        self.init_SCI = ['1', '2']
-        self.walk_SCI = ['2']
+        self.stop_SCI = cftset['stop_SCI']
+        self.init_SCI = cftset['init_SCI']
+        self.walk_SCI = cftset['walk_SCI']
 
     def convert_one_cpp_file(self, filename, is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=False):
         #if is healthy the gnd truth is on col 4 else it's on col 6
@@ -78,7 +82,7 @@ class cpp_file_tools:
                 #'-1' added to ignore time where the rat is in the air added by 'add_ground_truth'
                 if row[5] != '-1':
                     #cut after cue
-                    if row[5] in ['0', '3', '4'] and prevState in walk and cut_after_cue:
+                    if row[5] in self.stop_SCI and prevState in walk and cut_after_cue:
                         break
                     #don't select stim off
                     if row[4] == '0' and on_stim:

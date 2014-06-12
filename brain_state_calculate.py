@@ -7,70 +7,75 @@ import pickle
 from scipy.stats.mstats import mquantiles
 import Tkinter
 import tkFileDialog
+import settings
 
 import kohonen_neuron_c as kn
 
 
 class brain_state_calculate:
-    def __init__(self, weight_count, name='koho', ext_img='.png', save=False, show=False):
-        #rnd.seed(42)
-        #result for the state
-        self.stop = [1, 0]
-        self.default_res = [0, 0]
+    def __init__(self, weight_count, name='koho', ext_img='.png', save=False, show=False, settings_path="classifierSettings.yaml"):
         self.ext_img = ext_img
         self.save = save
         self.show = show
+        self.weight_count = weight_count
+        self.name = name
+        self.load_settings(settings_path)
+
+    def load_settings(self, settings_path):
+        cset = settings.Settings(settings_path).get()
+
+        #rnd.seed(42)
+        #result for the state
+        self.stop = cset['stop']
+        self.default_res = cset['default_res']
 
         #params for Test
-        self.test_all = False
-        self.combination_to_test = 50
+        self.test_all = cset['test_all']
+        self.combination_to_test = cset['combination_to_test']
         #self.A = np.array([[0.99, 0.01], [0.01, 0.99]])
-        self.A = np.array([[0.75, 0.25], [0.1, 0.9]])
+        self.A = np.array(cset['A'])
         #history length should be a prime number
-        self.history_length = 1
+        self.history_length = cset['history_length']
 
         #koho parameters
-        self.alpha = 0.01
-        self.koho_row = 1
-        self.koho_col = 7
+        self.alpha = cset['alpha']
+        self.koho_row = cset['koho_row']
+        self.koho_col = cset['koho_col']
         self.koho = []
         #number of neighbor to update in the network
-        self.neighbor = 3
+        self.neighbor = cset['neighbor']
         #min winning count to be consider as a good neuron
-        self.min_win = 7
+        self.min_win = cset['min_win']
         #number of best neurons to keep for calculate distance of obs to the network
-        self.dist_count = 3
-        self.max_weight = 5
-        self.weight_count = weight_count
+        self.dist_count = cset['dist_count']
+        self.max_weight = cset['max_weight']
 
         #simulated annealing parameters
         #change alpha each X iteration
-        self.change_alpha_iteration = 7
+        self.change_alpha_iteration = cset['change_alpha_iteration']
         #change alpha by a factor of
         #/!\ should be float
-        self.change_alpha_factor = 10.0
+        self.change_alpha_factor = cset['change_alpha_factor']
 
         #other parameter
         #store consecutive not a successfull trial used for train_nets
         self.was_bad = 0
         #channel modulated they are all modulated at the beginning
         self.mod_chan = range(self.weight_count)
-        self.verbose = True
-        self.name = name
+        self.verbose = cset['verbose']
 
         #quantile parameter
         #enable quantile
-        self.use_obs_quantile = False
-        quantile_step = 0.1
-        self.qVec = np.array(np.arange(0.0, 1.0, quantile_step))
+        self.use_obs_quantile = cset['use_obs_quantile']
         if self.use_obs_quantile:
-            self.A = np.array([[0.9, 0.1], [0.1, 0.9]])
+            quantile_step = cset['quantile_step']
+            self.qVec = np.arange(0.0, 1.0, quantile_step)
             self.weight_count = self.qVec.shape[0]
 
         #train simulated annealing parameter
-        self.tsa_alpha_start = 0.1
-        self.tsa_max_iteration = 14
-        self.tsa_max_accuracy = 0.99
+        self.tsa_alpha_start = cset['tsa_alpha_start']
+        self.tsa_max_iteration = cset['tsa_max_iteration']
+        self.tsa_max_accuracy = cset['tsa_max_accuracy']
 
     def build_networks(self):
         #build the network

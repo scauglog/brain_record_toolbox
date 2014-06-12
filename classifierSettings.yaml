@@ -1,0 +1,41 @@
+#result
+stop: [1,0]
+default_res: [0,0]
+
+#test settings
+#test all combination
+test_all: False
+combination_to_test: 50
+#HMM matrix
+A: [[0.75, 0.25],[0.1,0.9]]
+history_length: 1
+
+#kohonen parameter
+alpha: 0.01
+koho_row: 1
+koho_col: 7
+#number of neighbor to update
+neighbor: 3
+#minimum winning count to be a good neuron
+min_win: 7
+#number of best neurons to keep for calculate distance of obs to the network
+dist_count: 3
+#maximu of the weight when init
+max_weight: 5
+
+#simulated annealing settings
+#change alpha each X iteration
+change_alpha_iteration: 7
+#change alpha by a factor of (/!\ must be float)
+change_alpha_factor: 10.0
+
+verbose: True
+
+#use histograms instead of raw channel
+use_obs_quantile: False
+quantil_step: 0.1
+
+#training settings for simulated annealing
+tsa_alpha_start: 0.1
+tsa_max_iteration: 14
+tsa_max_accuracy: 0.99

@@ -54,6 +54,8 @@ class Classifier_GUI(Tk):
         self.ext_img = StringVar()
         self.ext_img.set('.png')
         self.save_folder=""
+        self.quantile_shrink = IntVar()
+        self.quantile_shrink.set(0)
 
     def redirect_IO(self):
         sys.stdout = IORedirector(self.tb_stdout)
@@ -68,14 +70,16 @@ class Classifier_GUI(Tk):
         res = self.my_bsc.load_networks_file(self.init_dir)
         if res >= 0:
             self.enable_all_button()
-        self.update_param()
+
         self.init_cft()
+        self.update_param()
 
     def create_classifier(self):
         self.disable_all_button()
-        self.my_bsc = bsc.brain_state_calculate(32)
+        self.my_bsc = bsc.brain_state_calculate(int(self.sb_weight_count_param.get())/int(self.sb_group_by_param.get()))
         self.init_cft()
-        res = self.my_bsc.init_networks_on_files(self.init_dir, self.my_cft)
+        self.update_classifier()
+        res = self.my_bsc.init_networks_on_files(self.init_dir, self.my_cft, train_mod_chan=self.mod_chan_on.get())
         print res
         if res >= 0:
             self.enable_all_button()
@@ -128,6 +132,11 @@ class Classifier_GUI(Tk):
         paths = self.splitlist(file_path)
         for path in paths:
             l_res, l_obs = self.my_cft.read_cpp_files([path], is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=self.stim_on.get())
+            if self.quantile_shrink.get():
+                tmp_l_obs = []
+                for obs in l_obs:
+                    tmp_l_obs.append(self.my_bsc.obs_to_quantiles(obs,self.mod_chan_on.get()))
+                l_obs = tmp_l_obs
             if len(l_obs) > 0:
                 self.my_cft.plot_obs(l_obs, l_res, dir_path=self.save_folder,  extra_txt=splitext(basename(path))[0], gui=True)
             else:
@@ -195,8 +204,11 @@ class Classifier_GUI(Tk):
         self.e_HMM_param.delete(0, END)
         self.e_HMM_param.insert(0, str(self.my_bsc.A))
 
+        self.sb_group_by_param.delete(0,"end")
+        self.sb_group_by_param.insert(0, self.my_cft.group_chan)
+
         self.sb_weight_count_param.delete(0, "end")
-        self.sb_weight_count_param.insert(0, self.my_bsc.weight_count)
+        self.sb_weight_count_param.insert(0, self.my_cft.chan_count)
 
         self.sb_history_length_param.delete(0, "end")
         self.sb_history_length_param.insert(0, self.my_bsc.history_length)
@@ -204,15 +216,22 @@ class Classifier_GUI(Tk):
         self.e_mod_chan_param.delete(0, END)
         self.e_mod_chan_param.insert(0, str(self.my_bsc.mod_chan))
 
+        self.quantile_shrink.set(self.my_bsc.use_obs_quantile)
+        self.t_quantile['text'] = str(self.my_bsc.qVec)
+
     def correct_list_string(self, text):
         return text.replace(' ', ',').replace('[,', '[').replace(',]', ']').replace(',,', ',').replace(',,', ',')
 
     def update_classifier(self):
         #convertion to obtain a correctly formated list from string list
         self.my_bsc.A = np.array(ast.literal_eval(self.correct_list_string(self.e_HMM_param.get())))
-        self.my_bsc.weight_count = int(self.sb_weight_count_param.get())
+        self.my_bsc.weight_count = int(self.sb_weight_count_param.get()) / int(self.sb_group_by_param.get())
         self.my_bsc.history_length = int(self.sb_history_length_param.get())
         self.my_bsc.mod_chan = ast.literal_eval(self.correct_list_string(self.e_mod_chan_param.get()))
+        self.my_bsc.use_quantile_shrink(self.quantile_shrink.get(), step=float(self.sb_quantile_step.get()))
+
+        self.my_cft.group_chan = int(self.sb_group_by_param.get())
+        self.my_cft.chan_count = int(self.sb_weight_count_param.get())
         self.my_cft.save = self.save_fig.get()
         self.my_cft.show = self.show_fig.get()
         self.my_cft.ext_img = self.ext_img.get()
@@ -270,12 +289,36 @@ class Classifier_GUI(Tk):
         self.t_HMM.grid(row=4, column=0, sticky=E)
         self.e_HMM_param = Entry(self.f_parameter, width=30)
         self.e_HMM_param.grid(row=4, column=1, sticky=W)
+        self.e_HMM_param.delete(0, END)
+        self.e_HMM_param.insert(0,str(np.array([[0.75, 0.25],[0.1,0.9]])))
 
         #mod chan
         self.t_mod_chan = Label(self.f_parameter, text="modulated channel")
         self.t_mod_chan.grid(row=5, column=0, sticky=E)
         self.e_mod_chan_param = Entry(self.f_parameter, width=30)
         self.e_mod_chan_param.grid(row=5, column=1, sticky=W)
+        self.e_mod_chan_param.delete(0, END)
+        self.e_mod_chan_param.insert(0, str(range(int(self.sb_weight_count_param.get())/int(self.sb_group_by_param.get()))))
+
+        #quantile
+        self.t_quantile_shrink = Label(self.f_parameter, text="quantile shrink")
+        self.t_quantile_shrink.grid(row=6, column=0, sticky=E)
+        self.cb_quantile_shrink = Checkbutton(self.f_parameter, variable=self.quantile_shrink)
+        self.cb_quantile_shrink.grid(row=6, column=1, sticky=W)
+
+        #quantile_step
+        self.t_quantile_step = Label(self.f_parameter, text="quantile step")
+        self.t_quantile_step.grid(row=7, column=0, sticky=E)
+        self.sb_quantile_step = Spinbox(self.f_parameter, from_=0.05, to=1, width=5, increment=0.05, format="%.2f")
+        self.sb_quantile_step.grid(row=7, column=1, sticky=W)
+
+        #quantil vector
+        self.t_quantile = Label(self.f_parameter, state=DISABLED)
+        self.t_quantile.grid(row=8, columnspan=2)
+
+        #update classifier parameter
+        self.b_update_classifier = Button(self.f_parameter, text="update classifier", command=self.update_classifier, state=DISABLED)
+        self.b_update_classifier.grid(row=9, columnspan=2)
 
         #train test
         self.f_train_test = LabelFrame(self.f_mainframe, padx=10, pady=10, text="Test and train parameter")
@@ -381,6 +424,7 @@ class Classifier_GUI(Tk):
         self.b_train['state'] = NORMAL
         self.b_obs['state'] = NORMAL
         self.b_train_test['state'] = NORMAL
+        self.b_update_classifier['state'] = NORMAL
         print "# # DONE # #"
 
     def disable_all_button(self):
@@ -388,6 +432,7 @@ class Classifier_GUI(Tk):
         self.b_train['state'] = DISABLED
         self.b_obs['state'] = DISABLED
         self.b_train_test['state'] = DISABLED
+        self.b_update_classifier['state'] = DISABLED
 
     def on_check_save_fig(self):
         if self.save_fig.get() == ON:

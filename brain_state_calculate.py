@@ -18,6 +18,7 @@ class brain_state_calculate:
         self.ext_img = ext_img
         self.save = save
         self.show = show
+        self.chan_count = weight_count
         self.weight_count = weight_count
         self.name = name
         self.load_settings(settings_path)
@@ -62,7 +63,7 @@ class brain_state_calculate:
         #store consecutive not a successfull trial used for train_nets
         self.was_bad = 0
         #channel modulated they are all modulated at the beginning
-        self.mod_chan = range(self.weight_count)
+        self.mod_chan = range(self.chan_count)
         self.verbose = cset['verbose']
 
         #quantile parameter
@@ -76,10 +77,9 @@ class brain_state_calculate:
 
     def use_quantile_shrink(self, use, step=0):
         self.use_obs_quantile = use
+        self.qVec = np.arange(0.0, 1.0, step)
         if use:
-            self.qvec = np.arange(0.0, 1.0, step)
-            self.weight_count = self.qvec.shape[0]
-
+            self.weight_count = self.qVec.shape[0]
 
     def build_networks(self):
         #build the network
@@ -158,7 +158,7 @@ class brain_state_calculate:
         if train_mod_chan:
             self.mod_chan = cft.get_mod_chan(l_obs)
         else:
-            self.mod_chan = range(self.weight_count)
+            self.mod_chan = range(self.chan_count)
 
     def init_networks_on_files(self, initdir, cft, train_mod_chan=False):
         root = Tkinter.Tk()
@@ -382,7 +382,7 @@ class brain_state_calculate:
 
     def train_nets(self, l_obs, l_res, cft, with_RL=True, obs_to_add=0, train_mod_chan=True):
         if not train_mod_chan:
-            self.mod_chan = range(self.weight_count)
+            self.mod_chan = range(self.chan_count)
 
         if len(l_obs) <= 0:
             print "l_obs empty"
@@ -496,7 +496,7 @@ class brain_state_calculate:
 
     def train_unsupervised_one_file(self, filename, cft, is_healthy=False, obs_to_add=-3, train_mod_chan=False, on_stim=False, autosave=False):
         if not train_mod_chan:
-            self.mod_chan = range(self.weight_count)
+            self.mod_chan = range(self.chan_count)
 
         l_res, l_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
         if l_obs <= 0:

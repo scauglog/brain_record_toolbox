@@ -118,7 +118,9 @@ class brain_state_calculate:
         dict['A'] = self.A
         dict['history_length'] = self.history_length
         dict['use_obs_quantile'] = self.use_obs_quantile
-        dict['qVec'] = self.qVec
+        if self.use_obs_quantile:
+            dict['qVec'] = self.qVec
+
         dict['weight_count'] = self.weight_count
 
         if self.koho == [] or self.mod_chan == []:

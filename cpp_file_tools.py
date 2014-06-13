@@ -521,12 +521,12 @@ class cpp_file_tools:
 
     def plot_result(self, list_of_res, extra_txt='', dir_path='', big_figure=True):
         if big_figure:
-            plt.figure(figsize=(10, 14))
+            fig = plt.figure(figsize=(10, 14))
         else:
-            plt.figure()
+            fig = plt.figure()
 
         cpt = 0
-        color=['b', 'r', 'g', 'm', 'c', 'y', 'k']
+        color = ['b', 'r', 'g', 'm', 'c', 'y', 'k']
         for key in list_of_res:
             plt.subplot(len(list_of_res.keys()), 1, cpt)
             plt.plot(list_of_res[key], color[cpt%len(color)], label=key)
@@ -542,17 +542,17 @@ class cpp_file_tools:
         if self.save:
             plt.savefig(dir_path + 'result' + extra_txt + self.ext_img, dpi=100)
         if not self.show:
-            plt.close()
+            plt.close(fig)
 
     def plot_obs(self, l_obs, l_res, extra_txt='', dir_path=''):
-        plt.figure()
+        fig = plt.figure()
         obs = np.vstack((np.array(l_obs).T,np.array(l_res).argmax(1).T*4,np.array(l_res).argmax(1).T*4))
         plt.imshow(obs, interpolation='none')
 
         if self.save:
             plt.savefig(dir_path+'obs'+extra_txt+self.ext_img)
         if not self.show:
-            plt.close()
+            plt.close(fig)
 
     def show_fig(self):
         plt.show()

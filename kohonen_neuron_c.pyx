@@ -363,7 +363,7 @@ cdef class Kohonen:
 
     #plot weight vector of the network in the same graph
     def plot_network(self, extra_text=''):
-        plt.figure()
+        fig = plt.figure()
         plt.suptitle('all neurons weights' + extra_text)
         for c in range(self.col):
             for r in range(self.row):
@@ -372,10 +372,10 @@ cdef class Kohonen:
         if self.save:
             plt.savefig('all_neurons_weights' + extra_text + self.img_ext, bbox_inches='tight')
         if not self.show:
-            plt.close()
+            plt.close(fig)
 
     def plot_network_array(self, extra_text=''):
-        plt.figure()
+        fig = plt.figure()
         cpt=1
         for c in range(self.col):
             for r in range(self.row):
@@ -386,10 +386,10 @@ cdef class Kohonen:
         if self.save:
             plt.savefig('all_neurons_weights_a' + extra_text + self.img_ext, bbox_inches='tight')
         if not self.show:
-            plt.close()
+            plt.close(fig)
 
     def plot_network_dist(self, extra_text=''):
-        plt.figure()
+        fig = plt.figure()
         net_dst = []
         for c in range(self.col):
             net_dst.append([])
@@ -415,11 +415,11 @@ cdef class Kohonen:
         if self.save:
             plt.savefig('network_dst_map' + extra_text + self.img_ext, bbox_inches='tight')
         if not self.show:
-            plt.close()
+            plt.close(fig)
 
     #same as plot_network (above) but only for the best neurons (win count > threshold)
     def plot_best_neurons(self, extra_text=''):
-        plt.figure()
+        fig = plt.figure()
         plt.suptitle('best neurons weights' + extra_text)
         for n in self.good_neurons:
             w = n.weights
@@ -427,12 +427,12 @@ cdef class Kohonen:
         if self.save:
             plt.savefig('best_neurons_weights' + extra_text + self.img_ext, bbox_inches='tight')
         if not self.show:
-            plt.close()
+            plt.close(fig)
 
     #plot templates of groups in the same graph (template=neuron weight vector average)
     def plot_groups(self, extra_text=''):
         if len(self.groups) != 0:
-            plt.figure()
+            fig = plt.figure()
             plt.suptitle('group weights' + extra_text)
             for gpe in self.groups:
                 w = gpe.template
@@ -440,7 +440,7 @@ cdef class Kohonen:
             if self.save:
                 plt.savefig('group_weights' + extra_text + self.img_ext, bbox_inches='tight')
             if not self.show:
-                plt.close()
+                plt.close(fig)
 
     #plot x(=spike_count) spike and color them according to the groups they belongs to
     def plot_spikes_classified(self, spikes_values, spike_count, threshold_template, extra_text=''):
@@ -448,7 +448,7 @@ cdef class Kohonen:
         if spike_count > len(s):
             spike_count = len(s)
 
-        plt.figure()
+        fig = plt.figure()
         plt.suptitle('spikes classified' + extra_text)
         for i in range(spike_count):
             #select a spike randomly
@@ -466,7 +466,7 @@ cdef class Kohonen:
         if self.save:
             plt.savefig('spikes_classified' + extra_text + self.img_ext, bbox_inches='tight')
         if not self.show:
-            plt.close()
+            plt.close(fig)
 
     #return the closest group of an observation
     def find_best_group(self, obs, double threshold_template=-1):
@@ -505,7 +505,7 @@ cdef class Kohonen:
     #plot group template and std (template=mean of weight vector of neurons)
     def plot_groups_stat(self, extra_text=''):
         if len(self.groups) != 0:
-            plt.figure()
+            fig = plt.figure()
 
             for gpe in self.groups:
                 x = range(gpe.template.shape[0])
@@ -515,7 +515,7 @@ cdef class Kohonen:
             if self.save:
                 plt.savefig('groups_mean_std' + extra_text + self.img_ext, bbox_inches='tight')
             if not self.show:
-                plt.close()
+                plt.close(fig)
 
 
 cdef class Group_neuron:

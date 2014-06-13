@@ -482,13 +482,19 @@ class brain_state_calculate:
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
         return 0
 
-    def train_unsupervised_one_file(self, filename, cft, is_healthy=False, obs_to_add=-3, on_stim=False):
+    def train_unsupervised_one_file(self, filename, cft, is_healthy=False, obs_to_add=-3, train_mod_chan=False, on_stim=False):
+        if not train_mod_chan:
+            self.mod_chan = range(self.weight_count)
+
         l_res, l_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
         if l_obs <= 0:
             print "l_obs empty"
         success, l_of_res = self.test(l_obs, l_res)
         l_obs_koho = cft.obs_classify_prev_res(l_obs, l_of_res[self.name], obs_to_add=obs_to_add)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)
+
+        if train_mod_chan:
+            self.mod_chan = cft.get_mod_chan(l_obs)
 
     def train_unsupervised_on_files(self, initdir, cft, is_healthy=False, obs_to_add=-3,  train_mod_chan=False, on_stim=False):
         if not train_mod_chan:

@@ -3,9 +3,10 @@ import cpp_file_tools as cft
 import ast
 import numpy as np
 import datetime
-import sys
 from Tkinter import *
+import ttk
 import tkFileDialog
+from os.path import basename, splitext
 
 class IORedirector(object):
     '''A general class for redirecting I/O to this Text widget.'''
@@ -35,13 +36,24 @@ class Classifier_GUI(Tk):
     def init_variable(self):
         self.my_bsc = None
         self.my_cft = None
-        self.init_dir = "C:\\"
+        self.init_dir = ""
         self.use_HMM = IntVar()
         self.use_HMM.set(1)
         self.new_day = IntVar()
         self.new_day.set(0)
         self.stim_on = IntVar()
+        self.stim_on.set(0)
         self.mod_chan_on = IntVar()
+        self.mod_chan_on.set(0)
+        self.include_classifier_res = IntVar()
+        self.include_classifier_res.set(0)
+        self.save_fig = IntVar()
+        self.save_fig.set(0)
+        self.show_fig = IntVar()
+        self.show_fig.set(1)
+        self.ext_img = StringVar()
+        self.ext_img.set('.png')
+        self.save_folder=""
 
     def redirect_IO(self):
         sys.stdout = IORedirector(self.tb_stdout)
@@ -81,6 +93,8 @@ class Classifier_GUI(Tk):
 
     def test_classifier(self):
         self.disable_all_button()
+        if self.save_folder == "" or self.save_folder == "/":
+            self.select_save_folder()
         self.update_classifier()
         file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=self.init_dir,  title="select cpp file to test the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
         if file_path == "":
@@ -92,12 +106,16 @@ class Classifier_GUI(Tk):
             l_res, l_obs = self.my_cft.read_cpp_files([path], is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=self.stim_on.get())
             if len(l_obs) > 0:
                 success, l_of_res = self.my_bsc.test(l_obs, l_res, on_modulate_chan=self.mod_chan_on.get())
-                self.my_cft.plot_result(l_of_res, big_figure=False)
+                if self.include_classifier_res.get():
+                    l_res, l_obs = self.my_cft.read_cpp_files([path], is_healthy=True, cut_after_cue=False, init_in_walk=True, on_stim=self.stim_on.get())
+                    l_of_res["file_result"] = np.array(l_res).argmax(1)
+                self.my_cft.plot_result(l_of_res, big_figure=False, dir_path=self.save_folder, extra_txt=splitext(basename(path))[0], gui=True)
             else:
                 print "empty file"
 
         self.enable_all_button()
-        self.my_cft.show_fig()
+        if self.show_fig.get():
+            self.my_cft.show_fig()
 
     def plot_brain(self):
         self.disable_all_button()
@@ -111,12 +129,13 @@ class Classifier_GUI(Tk):
         for path in paths:
             l_res, l_obs = self.my_cft.read_cpp_files([path], is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=self.stim_on.get())
             if len(l_obs) > 0:
-                self.my_cft.plot_obs(l_obs, l_res)
+                self.my_cft.plot_obs(l_obs, l_res, dir_path=self.save_folder,  extra_txt=splitext(basename(path))[0], gui=True)
             else:
                 print "empty file"
 
         self.enable_all_button()
-        self.my_cft.show_fig()
+        if self.show_fig.get():
+            self.my_cft.show_fig()
 
     def train_classifier(self):
         self.disable_all_button()
@@ -130,6 +149,45 @@ class Classifier_GUI(Tk):
             self.my_bsc.train_unsupervised_on_files(self.init_dir, self.my_cft, is_healthy=False, obs_to_add=int(self.sb_obs_to_add.get()), train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get())
         #after training new_day go back to 0
         self.new_day.set(0)
+        self.enable_all_button()
+
+    def train_test(self):
+        self.disable_all_button()
+        if self.save_folder == "" or self.save_folder == "/":
+            self.select_save_folder()
+        self.update_classifier()
+        file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=self.init_dir,  title="select cpp file to test the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
+        if file_path == "":
+            self.enable_all_button()
+            print "no file selected"
+            return -1
+
+        paths = self.splitlist(file_path)
+        for path in paths:
+            l_res, l_obs = self.my_cft.read_cpp_files([path], is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=self.stim_on.get())
+            if len(l_obs) > 0:
+                #test
+                success, l_of_res = self.my_bsc.test(l_obs, l_res, on_modulate_chan=self.mod_chan_on.get())
+                if self.include_classifier_res.get() > 0:
+                    l_res, l_obs = self.my_cft.read_cpp_files([path], is_healthy=True, cut_after_cue=False, init_in_walk=True, on_stim=self.stim_on.get())
+                    l_of_res["file_result"] = np.array(l_res).argmax(1)
+                self.my_cft.plot_result(l_of_res, big_figure=False, dir_path=self.save_folder, extra_txt=splitext(basename(path))[0], gui=True)
+
+                #train
+                training_method = self.sb_training.get()
+                if training_method == "RL":
+                    self.my_bsc.train_one_file(path, self.my_cft, is_healthy=False, new_day=self.new_day.get(), obs_to_add=int(self.sb_obs_to_add.get()), with_RL=True, train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get())
+                elif training_method == "noRL":
+                    self.my_bsc.train_one_file(path, self.my_cft, is_healthy=False, new_day=self.new_day.get(), obs_to_add=int(self.sb_obs_to_add.get()), with_RL=False, train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get())
+                elif training_method == "unsupervised":
+                    self.my_bsc.train_unsupervised_one_file(path, self.my_cft, is_healthy=False, obs_to_add=int(self.sb_obs_to_add.get()), train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get())
+                self.new_day.set(0)
+            else:
+                print "empty file"
+
+        if self.show_fig.get():
+            self.my_cft.show_fig()
+        #after training new_day go back to 0
         self.enable_all_button()
 
     def update_param(self):
@@ -154,9 +212,17 @@ class Classifier_GUI(Tk):
         self.my_bsc.weight_count = int(self.sb_weight_count_param.get())
         self.my_bsc.history_length = int(self.sb_history_length_param.get())
         self.my_bsc.mod_chan = ast.literal_eval(self.correct_list_string(self.e_mod_chan_param.get()))
+        self.my_cft.save = self.save_fig.get()
+        self.my_cft.show = self.show_fig.get()
+        self.my_cft.ext_img = self.ext_img.get()
 
     def change_dir(self):
         self.init_dir = tkFileDialog.askdirectory(initialdir=self.init_dir, mustexist=True)
+
+    def select_save_folder(self):
+        self.save_folder = tkFileDialog.askdirectory(initialdir=self.init_dir, mustexist=True, title="select the folder weher you want to save picture")
+        self.save_folder += '/'
+        self.t_save_folder['text'] = self.save_folder
 
     def init_window(self):
         #menubar
@@ -173,7 +239,7 @@ class Classifier_GUI(Tk):
         self.f_mainframe.pack(fill=X)
         #parameter of the classifier
         self.f_parameter = LabelFrame(self.f_mainframe, text="Classifier parameter", padx=10,pady=10)
-        self.f_parameter.grid(row=0,column=0)
+        self.f_parameter.grid(row=0, column=0)
 
         self.tb_stdout = Text(self.f_mainframe)
         self.tb_stdout.grid(row=0, column=1, rowspan=2)
@@ -212,47 +278,87 @@ class Classifier_GUI(Tk):
 
         #train test
         self.f_train_test = LabelFrame(self.f_mainframe, padx=10, pady=10, text="Test and train parameter")
-        self.f_train_test.grid(row=1,column=0)
+        self.f_train_test.grid(row=1, column=0)
 
         #train test parameter
-        self.f_train_test_parameter = Frame(self.f_train_test)
-        self.f_train_test_parameter.grid(row=1, column=0)
+        self.nb_train_test_param = ttk.Notebook(self.f_train_test)
+        self.nb_train_test_param.grid(row=0, column=0, padx=10)
 
-        self.sb_training = Spinbox(self.f_train_test_parameter, values=("RL", "noRL", "unsupervised"), width=5)
+        #train parameter
+        self.f_train_parameter = Frame(self.nb_train_test_param, padx=10, pady=10)
+        self.f_train_parameter.grid(row=0, column=0)
+        self.nb_train_test_param.add(self.f_train_parameter, text="Train")
+
+        self.sb_training = Spinbox(self.f_train_parameter, values=("RL", "noRL", "unsupervised"), width=5)
         self.sb_training.grid(row=0, column=0, sticky=E)
-        self.t_training_method = Label(self.f_train_test_parameter, text="training method")
+        self.t_training_method = Label(self.f_train_parameter, text="training method")
         self.t_training_method.grid(row=0, column=1, sticky=W)
 
-        self.sb_obs_to_add = Spinbox(self.f_train_test_parameter, from_=-10, to=10, width=5)
+        self.sb_obs_to_add = Spinbox(self.f_train_parameter, from_=-10, to=10, width=5)
         self.sb_obs_to_add.grid(row=1, column=0, sticky=E)
         self.sb_obs_to_add.delete(0, END)
         self.sb_obs_to_add.insert(0, 0)
-        self.t_obs_to_add = Label(self.f_train_test_parameter, text="obs to add")
+        self.t_obs_to_add = Label(self.f_train_parameter, text="obs to add")
         self.t_obs_to_add.grid(row=1, column=1, sticky=W)
 
-        self.cb_use_HMM = Checkbutton(self.f_train_test_parameter, variable=self.use_HMM)
+        self.cb_use_HMM = Checkbutton(self.f_train_parameter, variable=self.use_HMM)
         self.cb_use_HMM.grid(row=2, column=0, sticky=E)
-        self.t_use_HMM = Label(self.f_train_test_parameter, text="use HMM")
+        self.t_use_HMM = Label(self.f_train_parameter, text="use HMM")
         self.t_use_HMM.grid(row=2, column=1, sticky=W)
 
-        self.cb_new_day = Checkbutton(self.f_train_test_parameter, variable=self.new_day)
+        self.cb_new_day = Checkbutton(self.f_train_parameter, variable=self.new_day)
         self.cb_new_day.grid(row=3, column=0, sticky=E)
-        self.t_new_day = Label(self.f_train_test_parameter, text="new day")
+        self.t_new_day = Label(self.f_train_parameter, text="new day")
         self.t_new_day.grid(row=3, column=1, sticky=W)
 
-        self.cb_stim_on = Checkbutton(self.f_train_test_parameter, variable=self.stim_on)
+        self.cb_stim_on = Checkbutton(self.f_train_parameter, variable=self.stim_on)
         self.cb_stim_on.grid(row=4, column=0, sticky=E)
-        self.t_stim_on = Label(self.f_train_test_parameter, text="stim on only")
+        self.t_stim_on = Label(self.f_train_parameter, text="stim on only")
         self.t_stim_on.grid(row=4, column=1, sticky=W)
 
-        self.cb_mod_chan_on = Checkbutton(self.f_train_test_parameter, variable=self.mod_chan_on)
+        self.cb_mod_chan_on = Checkbutton(self.f_train_parameter, variable=self.mod_chan_on)
         self.cb_mod_chan_on.grid(row=5, column=0, sticky=E)
-        self.t_mod_chan_on = Label(self.f_train_test_parameter, text="train on modulated channel")
+        self.t_mod_chan_on = Label(self.f_train_parameter, text="train on modulated channel")
         self.t_mod_chan_on.grid(row=5, column=1, sticky=W)
+
+        #test parameter
+        self.f_test_parameter = Frame(self.nb_train_test_param, padx=10, pady=10)
+        self.f_test_parameter.grid(row=0, column=0)
+        self.nb_train_test_param.add(self.f_test_parameter, text="Test")
+
+        self.cb_include_decoded = Checkbutton(self.f_test_parameter, variable=self.include_classifier_res)
+        self.cb_include_decoded.grid(row=0, column=0, sticky=E)
+        self.t_include_decoded = Label(self.f_test_parameter, text="include file results")
+        self.t_include_decoded.grid(row=0, column=1, sticky=W)
+
+        self.cb_show_fig = Checkbutton(self.f_test_parameter, variable=self.show_fig, command=self.on_check_save_fig)
+        self.cb_show_fig.grid(row=1, column=0, sticky=E)
+        self.t_show_fig = Label(self.f_test_parameter, text="show figure")
+        self.t_show_fig.grid(row=1, column=1, sticky=W)
+
+        self.cb_save_fig = Checkbutton(self.f_test_parameter, variable=self.save_fig, command=self.on_check_save_fig)
+        self.cb_save_fig.grid(row=2, column=0, sticky=E)
+        self.t_save_fig = Label(self.f_test_parameter, text="save figure")
+        self.t_save_fig.grid(row=2, column=1, sticky=W)
+
+        self.b_save_folder = Button(self.f_test_parameter, text="Saving folder", command=self.select_save_folder, state=DISABLED)
+        self.b_save_folder.grid(row=3, column=0, sticky=E)
+        self.t_save_folder = Label(self.f_test_parameter, height=1, width=20, state=DISABLED, anchor=W)
+        self.t_save_folder.grid(row=3, column=1, sticky=W)
+
+        self.rb_ext_img_eps = Radiobutton(self.f_test_parameter, variable=self.ext_img, value=".eps", state=DISABLED)
+        self.rb_ext_img_eps.grid(row=4, column=0, sticky=E)
+        self.t_ext_img_eps = Label(self.f_test_parameter, text='.eps', state=DISABLED)
+        self.t_ext_img_eps.grid(row=4, column=1, sticky=W)
+
+        self.rb_ext_img_png = Radiobutton(self.f_test_parameter, variable=self.ext_img, value=".png", state=DISABLED)
+        self.rb_ext_img_png.grid(row=5, column=0, sticky=E)
+        self.t_ext_img_png = Label(self.f_test_parameter, text='.png', state=DISABLED)
+        self.t_ext_img_png.grid(row=5, column=1, sticky=W)
 
         #train test button
         self.f_train_test_button = Frame(self.f_train_test)
-        self.f_train_test_button.grid(row=1, column=1)
+        self.f_train_test_button.grid(row=0, column=1)
 
         self.b_test = Button(self.f_train_test_button, text="test classifier", command=self.test_classifier, state=DISABLED)
         self.b_test.grid(row=0, column=0, pady=10)
@@ -265,18 +371,36 @@ class Classifier_GUI(Tk):
         self.b_train = Button(self.f_train_test_button, text="train classifier", command=self.train_classifier, state=DISABLED)
         self.b_train.grid(row=2, column=0, pady=10)
 
-
+        self.b_train_test = Button(self.f_train_test_button, text="train and test", command=self.train_test, state=DISABLED)
+        self.b_train_test.grid(row=3, column=0, pady=10)
 
     def enable_all_button(self):
         self.filemenu.entryconfig(2, state=NORMAL)
         self.b_test['state'] = NORMAL
         self.b_train['state'] = NORMAL
         self.b_obs['state'] = NORMAL
+        self.b_train_test['state'] = NORMAL
+        print "# # DONE # #"
 
     def disable_all_button(self):
         self.b_test['state'] = DISABLED
         self.b_train['state'] = DISABLED
         self.b_obs['state'] = DISABLED
+        self.b_train_test['state'] = DISABLED
+
+    def on_check_save_fig(self):
+        if self.save_fig.get() == ON:
+            self.b_save_folder['state'] = NORMAL
+            self.rb_ext_img_eps['state'] = NORMAL
+            self.t_ext_img_eps['state'] = NORMAL
+            self.rb_ext_img_png['state'] = NORMAL
+            self.t_ext_img_png['state'] = NORMAL
+        elif self.save_fig.get() == OFF:
+            self.b_save_folder['state'] = DISABLED
+            self.rb_ext_img_eps['state'] = DISABLED
+            self.t_ext_img_eps['state'] = DISABLED
+            self.rb_ext_img_png['state'] = DISABLED
+            self.t_ext_img_png['state'] = DISABLED
 
 app = Classifier_GUI(None)
 app.mainloop()

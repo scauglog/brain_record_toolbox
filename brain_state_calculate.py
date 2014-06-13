@@ -8,6 +8,7 @@ from scipy.stats.mstats import mquantiles
 import Tkinter
 import tkFileDialog
 import settings
+import time
 
 import kohonen_neuron_c as kn
 
@@ -66,16 +67,19 @@ class brain_state_calculate:
 
         #quantile parameter
         #enable quantile
-        self.use_obs_quantile = cset['use_obs_quantile']
-        if self.use_obs_quantile:
-            quantile_step = cset['quantile_step']
-            self.qVec = np.arange(0.0, 1.0, quantile_step)
-            self.weight_count = self.qVec.shape[0]
+        self.use_quantile_shrink(cset['use_obs_quantile'], step=cset['quantile_step'])
 
         #train simulated annealing parameter
         self.tsa_alpha_start = cset['tsa_alpha_start']
         self.tsa_max_iteration = cset['tsa_max_iteration']
         self.tsa_max_accuracy = cset['tsa_max_accuracy']
+
+    def use_quantile_shrink(self, use, step=0):
+        self.use_obs_quantile = use
+        if use:
+            self.qvec = np.arange(0.0, 1.0, step)
+            self.weight_count = self.qvec.shape[0]
+
 
     def build_networks(self):
         #build the network
@@ -183,7 +187,7 @@ class brain_state_calculate:
         if on_modulate_chan and not self.use_obs_quantile:
             obs = self.get_only_mod_chan(obs)
         if self.use_obs_quantile:
-            obs = self.obs_to_quantiles(obs)
+            obs = self.obs_to_quantiles(obs, on_modulate_chan=on_modulate_chan)
         #test one obs
         dist_res = np.arange(0, len(self.koho), 1.0)
         best_ns = []
@@ -259,8 +263,11 @@ class brain_state_calculate:
                 obs_mod[c] = 0
         return obs_mod
 
-    def obs_to_quantiles(self, obs):
-        return mquantiles(obs, self.qVec)
+    def obs_to_quantiles(self, obs, on_modulate_chan=False):
+        if on_modulate_chan:
+            return mquantiles(obs[self.mod_chan], self.qVec)
+        else:
+            return mquantiles(obs, self.qVec)
 
     def compute_network_accuracy(self, best_ns, dist_res, obs):
         #we test combination of each best n
@@ -449,7 +456,7 @@ class brain_state_calculate:
 
         return 0
 
-    def train_on_files(self, initdir, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True, on_stim=False):
+    def train_on_files(self, initdir, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True, on_stim=False, autosave=False):
         root = Tkinter.Tk()
         root.withdraw()
         file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=initdir,  title="select cpp file to train the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
@@ -463,15 +470,20 @@ class brain_state_calculate:
         if new_day:
             self.train_nets_new_day(all_obs, all_res, cft)
 
-        return self.train_nets(all_obs, all_res, cft, with_RL=with_RL, obs_to_add=obs_to_add, train_mod_chan=train_mod_chan)
+        return_value = self.train_nets(all_obs, all_res, cft, with_RL=with_RL, obs_to_add=obs_to_add, train_mod_chan=train_mod_chan)
+        if autosave:
+            self.save_obj(paths[-1]+str(time.time())+'.pyObj')
+        return return_value
 
-    def train_one_file(self, filename, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True, on_stim=False):
+    def train_one_file(self, filename, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True, on_stim=False, autosave=False):
         all_res, all_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
 
         if new_day:
             self.train_nets_new_day(all_obs, all_res, cft)
 
         self.train_nets(all_obs, all_res, cft, with_RL=with_RL, obs_to_add=obs_to_add, train_mod_chan=train_mod_chan)
+        if autosave:
+            self.save_obj(filename+str(time.time())+'.pyObj')
 
     def train_nets_new_day(self, l_obs, l_res, cft):
         if len(l_obs) <= 0:
@@ -482,7 +494,7 @@ class brain_state_calculate:
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
         return 0
 
-    def train_unsupervised_one_file(self, filename, cft, is_healthy=False, obs_to_add=-3, train_mod_chan=False, on_stim=False):
+    def train_unsupervised_one_file(self, filename, cft, is_healthy=False, obs_to_add=-3, train_mod_chan=False, on_stim=False, autosave=False):
         if not train_mod_chan:
             self.mod_chan = range(self.weight_count)
 
@@ -495,8 +507,10 @@ class brain_state_calculate:
 
         if train_mod_chan:
             self.mod_chan = cft.get_mod_chan(l_obs)
+        if autosave:
+            self.save_obj(filename+str(time.time())+'.pyObj')
 
-    def train_unsupervised_on_files(self, initdir, cft, is_healthy=False, obs_to_add=-3,  train_mod_chan=False, on_stim=False):
+    def train_unsupervised_on_files(self, initdir, cft, is_healthy=False, obs_to_add=-3,  train_mod_chan=False, on_stim=False, autosave=False):
         if not train_mod_chan:
             self.mod_chan = range(self.weight_count)
 
@@ -519,4 +533,6 @@ class brain_state_calculate:
 
         if train_mod_chan:
             self.mod_chan = cft.get_mod_chan(l_obs)
+        if autosave:
+            self.save_obj(paths[-1]+str(time.time())+'.pyObj')
         return 0

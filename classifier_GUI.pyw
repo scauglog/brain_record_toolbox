@@ -142,11 +142,11 @@ class Classifier_GUI(Tk):
         self.update_classifier()
         training_method = self.sb_training.get()
         if training_method == "RL":
-            self.my_bsc.train_on_files(self.init_dir, self.my_cft, is_healthy=False, new_day=self.new_day.get(), obs_to_add=int(self.sb_obs_to_add.get()), with_RL=True, train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get())
+            self.my_bsc.train_on_files(self.init_dir, self.my_cft, is_healthy=False, new_day=self.new_day.get(), obs_to_add=int(self.sb_obs_to_add.get()), with_RL=True, train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get(), autosave=True)
         elif training_method == "noRL":
-            self.my_bsc.train_on_files(self.init_dir, self.my_cft, is_healthy=False, new_day=self.new_day.get(), obs_to_add=int(self.sb_obs_to_add.get()), with_RL=False, train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get())
+            self.my_bsc.train_on_files(self.init_dir, self.my_cft, is_healthy=False, new_day=self.new_day.get(), obs_to_add=int(self.sb_obs_to_add.get()), with_RL=False, train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get(), autosave=True)
         elif training_method == "unsupervised":
-            self.my_bsc.train_unsupervised_on_files(self.init_dir, self.my_cft, is_healthy=False, obs_to_add=int(self.sb_obs_to_add.get()), train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get())
+            self.my_bsc.train_unsupervised_on_files(self.init_dir, self.my_cft, is_healthy=False, obs_to_add=int(self.sb_obs_to_add.get()), train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get(), autosave=True)
         #after training new_day go back to 0
         self.new_day.set(0)
         self.enable_all_button()
@@ -176,19 +176,20 @@ class Classifier_GUI(Tk):
                 #train
                 training_method = self.sb_training.get()
                 if training_method == "RL":
-                    self.my_bsc.train_one_file(path, self.my_cft, is_healthy=False, new_day=self.new_day.get(), obs_to_add=int(self.sb_obs_to_add.get()), with_RL=True, train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get())
+                    self.my_bsc.train_one_file(path, self.my_cft, is_healthy=False, new_day=self.new_day.get(), obs_to_add=int(self.sb_obs_to_add.get()), with_RL=True, train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get(), autosave=True)
                 elif training_method == "noRL":
-                    self.my_bsc.train_one_file(path, self.my_cft, is_healthy=False, new_day=self.new_day.get(), obs_to_add=int(self.sb_obs_to_add.get()), with_RL=False, train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get())
+                    self.my_bsc.train_one_file(path, self.my_cft, is_healthy=False, new_day=self.new_day.get(), obs_to_add=int(self.sb_obs_to_add.get()), with_RL=False, train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get(), autosave=True)
                 elif training_method == "unsupervised":
-                    self.my_bsc.train_unsupervised_one_file(path, self.my_cft, is_healthy=False, obs_to_add=int(self.sb_obs_to_add.get()), train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get())
+                    self.my_bsc.train_unsupervised_one_file(path, self.my_cft, is_healthy=False, obs_to_add=int(self.sb_obs_to_add.get()), train_mod_chan=self.mod_chan_on.get(), on_stim=self.stim_on.get(), autosave=True)
+                #after training new_day go back to 0
                 self.new_day.set(0)
             else:
                 print "empty file"
 
+        self.enable_all_button()
         if self.show_fig.get():
             self.my_cft.show_fig()
-        #after training new_day go back to 0
-        self.enable_all_button()
+
 
     def update_param(self):
         self.e_HMM_param.delete(0, END)

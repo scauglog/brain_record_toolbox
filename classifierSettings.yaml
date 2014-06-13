@@ -33,7 +33,7 @@ verbose: True
 
 #use histograms instead of raw channel
 use_obs_quantile: False
-quantil_step: 0.1
+quantile_step: 0.1
 
 #training settings for simulated annealing
 tsa_alpha_start: 0.1

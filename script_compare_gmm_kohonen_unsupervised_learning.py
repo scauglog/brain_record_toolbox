@@ -40,10 +40,12 @@ for i in range(5, len(files0423)):
     #test
     print '### ### ### ### ### ### ### ### ###'
     print files0423[i-1:i]
-    l_res, l_obs = my_cft.convert_cpp_file(dir_name, 't_0423', files0423[i-1:i], False, cut_after_cue=False, init_in_walk=True)
+    l_res, l_obs = my_cft.convert_cpp_file(dir_name, 't_0423', files0423[i - 1:i], False, cut_after_cue=False,
+                                           init_in_walk=True)
     success, l_of_res = my_bsc.test(l_obs, l_res)
     success2, l_of_res2 = my_bsc2.test(l_obs, l_res)
-    l_res_gmm, l_obs_trash = my_cft.convert_cpp_file(dir_name, 't_0423', files0423[i-1:i], True, cut_after_cue=False, init_in_walk=True)
+    l_res_gmm, l_obs_trash = my_cft.convert_cpp_file(dir_name, 't_0423', files0423[i - 1:i], True, cut_after_cue=False,
+                                                     init_in_walk=True)
     l_of_res.update(l_of_res2)
     l_of_res['GMM']=np.array(l_res_gmm).argmax(1)
     print success, success2

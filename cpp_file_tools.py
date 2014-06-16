@@ -41,12 +41,15 @@ class cpp_file_tools:
         self.init_SCI = cftset['init_SCI']
         self.walk_SCI = cftset['walk_SCI']
 
-    def convert_one_cpp_file(self, filename, is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=False):
+        self.cue_col = cftset['cue_col']
+        self.result_col = cftset['result_col']
+
+    def convert_one_cpp_file(self, filename, use_classifier_result=False, cut_after_cue=False, init_in_walk=True, on_stim=False):
         #if is healthy the gnd truth is on col 4 else it's on col 6
         l_obs = []
         l_res = []
         #read 'howto file reading.txt' to understand
-        if is_healthy:
+        if use_classifier_result:
             #col 4
             stop = self.stop_healthy
             walk = self.walk_healthy
@@ -72,17 +75,17 @@ class cpp_file_tools:
         for row in file:
             if len(row) > self.first_chan and row[0] != '0':
                 #if rat is healthy walk state are in col 4 otherwise in col 6 see 'howto file reading file'
-                if is_healthy:
-                    ratState = row[3]
+                if use_classifier_result:
+                    ratState = row[self.result_col]
                 else:
-                    ratState = row[5]
+                    ratState = row[self.cue_col]
 
                 #add brain state to l_obs and convert number to float
                 brain_state = self.convert_brain_state(row[self.first_chan:self.chan_count+self.first_chan])
                 #'-1' added to ignore time where the rat is in the air added by 'add_ground_truth'
-                if row[5] != '-1':
+                if row[self.cue_col] != '-1':
                     #cut after cue
-                    if row[5] in self.stop_SCI and prevState in walk and cut_after_cue:
+                    if row[self.cue_col] in self.stop_SCI and prevState in walk and cut_after_cue:
                         break
                     #don't select stim off
                     if row[4] == '0' and on_stim:
@@ -96,25 +99,23 @@ class cpp_file_tools:
                         l_res.append(self.walk)
                         l_obs.append(brain_state)
 
-                    if row[5] in ['1', '2']:
+                    if row[self.cue_col] in self.walk_SCI:
                         prevState = walk[0]
 
         return l_res, l_obs
 
-    def convert_cpp_file(self, dir_name, date, files, is_healthy=False, file_core_name='healthyOutput_', cut_after_cue=False, init_in_walk=True):
-        #if is healthy gnd truth is on col 4 else on col 6
-
+    def convert_cpp_file(self, dir_name, date, files, use_classifier_result=False, file_core_name='healthyOutput_',
+                         cut_after_cue=False, init_in_walk=True):
         files = self.convert_to_filename_list(dir_name, date, files, file_core_name)
-        return self.read_cpp_files(files, is_healthy, cut_after_cue, init_in_walk)
+        return self.read_cpp_files(files, use_classifier_result, cut_after_cue, init_in_walk)
 
-    def read_cpp_files(self, files, is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=False):
-        #if is healthy gnd truth is on col 4 else on col 6
+    def read_cpp_files(self, files, use_classifier_result=False, cut_after_cue=False, init_in_walk=True, on_stim=False):
         #convert cpp file to list of obs and list of res
         l_obs = []
         l_res = []
         #read 'howto file reading.txt' to understand
         for f in files:
-            l_res_tmp, l_obs_tmp = self.convert_one_cpp_file(f, is_healthy, cut_after_cue, init_in_walk, on_stim)
+            l_res_tmp, l_obs_tmp = self.convert_one_cpp_file(f, use_classifier_result, cut_after_cue, init_in_walk, on_stim)
             l_obs += l_obs_tmp
             l_res += l_res_tmp
         return l_res, l_obs

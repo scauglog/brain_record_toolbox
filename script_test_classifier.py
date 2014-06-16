@@ -23,7 +23,7 @@ if not file_path == "":
 
     for f in files:
         print(f)
-        l_res, l_obs = my_cft.read_cpp_files([f], is_healthy=False, cut_after_cue=True, init_in_walk=True)
+        l_res, l_obs = my_cft.read_cpp_files([f], use_classifier_result=False, cut_after_cue=True, init_in_walk=True)
         success, l_of_res = my_bsc.test(l_obs, l_res)
         my_cft.plot_result(l_of_res)
         plt.figure()

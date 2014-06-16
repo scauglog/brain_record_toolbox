@@ -33,16 +33,16 @@ for i in range(5, len(files0423)):
     #test all
     print '### ### ### ### ### ### ### ### ###'
     print files0423[i:i+1]
-    l_res, l_obs = my_cft.convert_cpp_file(dir_name, 't_0423', files0423[i:i+1], False)
+    l_res, l_obs = my_cft.convert_cpp_file(dir_name, 't_0423', files0423[i:i + 1], False)
     success, l_of_res = my_bsc.test(l_obs, l_res, True)
-    l_res_gmm, l_obs_trash = my_cft.convert_cpp_file(dir_name, 't_0423', files0423[i:i+1], True)
+    l_res_gmm, l_obs_trash = my_cft.convert_cpp_file(dir_name, 't_0423', files0423[i:i + 1], True)
     l_of_res['GMM'] = np.array(l_res_gmm).argmax(1)
     print success
     l_of_res['GMM&koho'] = np.array(l_of_res[my_bsc.name])+np.array(l_of_res['GMM']) > 1
     my_cft.plot_result(l_of_res, 'file_'+str(files0423[i:i+1])+'_')
 
     #train again
-    l_res, l_obs = my_cft.convert_cpp_file(dir_name, 't_0423', files0423[i:i+1], False)
+    l_res, l_obs = my_cft.convert_cpp_file(dir_name, 't_0423', files0423[i:i + 1], False)
     l_obs_koho = my_cft.obs_classify_mixed_res(l_obs, l_res, l_of_res[my_bsc.name], 5)
     #train networks
     my_bsc.simulated_annealing(l_obs, l_obs_koho, l_res, 0.01, 7, 0.99, True)

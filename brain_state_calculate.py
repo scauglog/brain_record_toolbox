@@ -150,7 +150,7 @@ class brain_state_calculate:
 
 
     def init_networks(self, files, cft, train_mod_chan=False):
-        l_res, l_obs = cft.read_cpp_files(files, is_healthy=False, cut_after_cue=False)
+        l_res, l_obs = cft.read_cpp_files(files, use_classifier_result=False, cut_after_cue=False)
         l_obs_koho = cft.obs_classify_kohonen(l_obs)
         #train networks
         self.build_networks()
@@ -465,7 +465,8 @@ class brain_state_calculate:
 
         paths = root.tk.splitlist(file_path)
 
-        all_res, all_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
+        all_res, all_obs = cft.read_cpp_files(paths, use_classifier_result=is_healthy, cut_after_cue=False,
+                                              init_in_walk=True, on_stim=on_stim)
 
         if new_day:
             self.train_nets_new_day(all_obs, all_res, cft)
@@ -476,7 +477,8 @@ class brain_state_calculate:
         return return_value
 
     def train_one_file(self, filename, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True, on_stim=False, autosave=False):
-        all_res, all_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
+        all_res, all_obs = cft.read_cpp_files([filename], use_classifier_result=is_healthy, cut_after_cue=False,
+                                              init_in_walk=True, on_stim=on_stim)
 
         if new_day:
             self.train_nets_new_day(all_obs, all_res, cft)
@@ -498,7 +500,8 @@ class brain_state_calculate:
         if not train_mod_chan:
             self.mod_chan = range(self.chan_count)
 
-        l_res, l_obs = cft.read_cpp_files([filename], is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
+        l_res, l_obs = cft.read_cpp_files([filename], use_classifier_result=is_healthy, cut_after_cue=False,
+                                          init_in_walk=True, on_stim=on_stim)
         if l_obs <= 0:
             print "l_obs empty"
         success, l_of_res = self.test(l_obs, l_res)
@@ -522,7 +525,8 @@ class brain_state_calculate:
 
         paths = root.tk.splitlist(file_path)
 
-        l_res, l_obs = cft.read_cpp_files(paths, is_healthy=is_healthy, cut_after_cue=False, init_in_walk=True, on_stim=on_stim)
+        l_res, l_obs = cft.read_cpp_files(paths, use_classifier_result=is_healthy, cut_after_cue=False,
+                                          init_in_walk=True, on_stim=on_stim)
         if len(l_obs) <= 0:
             print "l_obs empty"
             return -2

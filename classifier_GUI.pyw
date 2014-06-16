@@ -107,11 +107,13 @@ class Classifier_GUI(Tk):
 
         paths = self.splitlist(file_path)
         for path in paths:
-            l_res, l_obs = self.my_cft.read_cpp_files([path], is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=self.stim_on.get())
+            l_res, l_obs = self.my_cft.read_cpp_files([path], use_classifier_result=False, cut_after_cue=False,
+                                                      init_in_walk=True, on_stim=self.stim_on.get())
             if len(l_obs) > 0:
                 success, l_of_res = self.my_bsc.test(l_obs, l_res, on_modulate_chan=self.mod_chan_on.get())
                 if self.include_classifier_res.get():
-                    l_res, l_obs = self.my_cft.read_cpp_files([path], is_healthy=True, cut_after_cue=False, init_in_walk=True, on_stim=self.stim_on.get())
+                    l_res, l_obs = self.my_cft.read_cpp_files([path], use_classifier_result=True, cut_after_cue=False,
+                                                              init_in_walk=True, on_stim=self.stim_on.get())
                     l_of_res["file_result"] = np.array(l_res).argmax(1)
                 self.my_cft.plot_result(l_of_res, big_figure=False, dir_path=self.save_folder, extra_txt=splitext(basename(path))[0], gui=True)
             else:
@@ -131,7 +133,8 @@ class Classifier_GUI(Tk):
 
         paths = self.splitlist(file_path)
         for path in paths:
-            l_res, l_obs = self.my_cft.read_cpp_files([path], is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=self.stim_on.get())
+            l_res, l_obs = self.my_cft.read_cpp_files([path], use_classifier_result=False, cut_after_cue=False,
+                                                      init_in_walk=True, on_stim=self.stim_on.get())
             if self.quantile_shrink.get():
                 tmp_l_obs = []
                 for obs in l_obs:
@@ -173,12 +176,14 @@ class Classifier_GUI(Tk):
 
         paths = self.splitlist(file_path)
         for path in paths:
-            l_res, l_obs = self.my_cft.read_cpp_files([path], is_healthy=False, cut_after_cue=False, init_in_walk=True, on_stim=self.stim_on.get())
+            l_res, l_obs = self.my_cft.read_cpp_files([path], use_classifier_result=False, cut_after_cue=False,
+                                                      init_in_walk=True, on_stim=self.stim_on.get())
             if len(l_obs) > 0:
                 #test
                 success, l_of_res = self.my_bsc.test(l_obs, l_res, on_modulate_chan=self.mod_chan_on.get())
                 if self.include_classifier_res.get() > 0:
-                    l_res, l_obs = self.my_cft.read_cpp_files([path], is_healthy=True, cut_after_cue=False, init_in_walk=True, on_stim=self.stim_on.get())
+                    l_res, l_obs = self.my_cft.read_cpp_files([path], use_classifier_result=True, cut_after_cue=False,
+                                                              init_in_walk=True, on_stim=self.stim_on.get())
                     l_of_res["file_result"] = np.array(l_res).argmax(1)
                 self.my_cft.plot_result(l_of_res, big_figure=False, dir_path=self.save_folder, extra_txt=splitext(basename(path))[0], gui=True)
 

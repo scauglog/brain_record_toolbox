@@ -25,3 +25,6 @@ walk_healthy: ['-2']
 stop_SCI: ['0','3','4']
 init_SCI: ['1','2']
 walk_SCI: ['2']
+
+cue_col: 5
+result_col: 3

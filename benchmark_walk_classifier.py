@@ -349,7 +349,7 @@ class Benchmark(object):
 
                     #get obs
                     files = self.my_cft.convert_to_filename_list(dir_name, fulldate, self.SCI_files[rat][date][n:n+1], self.SCI_corename)
-                    l_res, l_obs = self.my_cft.read_cpp_files(files, is_healthy=False, cut_after_cue=False)
+                    l_res, l_obs = self.my_cft.read_cpp_files(files, use_classifier_result=False, cut_after_cue=False)
                     #if the trial is too short or have no neuron modulated we don't train
                     if len(l_obs) > self.SCI_min_obs and np.array(l_obs).sum() > 0:
                         if shuffle_obs:
@@ -386,7 +386,7 @@ class Benchmark(object):
 
         for i in range(self.simulated_first_train, len(self.simulated_files)):
             files = self.my_cft.convert_to_filename_list(self.simulated_dir_name, self.simulated_date, self.simulated_files[i:i+1], self.simulated_corename)
-            l_res, l_obs = self.my_cft.read_cpp_files(files, is_healthy=False, cut_after_cue=False)
+            l_res, l_obs = self.my_cft.read_cpp_files(files, use_classifier_result=False, cut_after_cue=False)
 
             #change the value
             for chg in chg_obs:
@@ -409,7 +409,11 @@ class Benchmark(object):
             print rat+'_'+str(date)+'_'+str(i)+str(self.simulated_files[i:i+1])
 
             l_of_res = self.test_network_with_obs(l_obs, l_res)
-            l_res_gnd_truth, l_obs_trash = self.my_cft.convert_cpp_file(self.simulated_dir_name, self.simulated_date, self.simulated_files[i:i+1], is_healthy=False, file_core_name=self.simulated_corename,cut_after_cue=False)
+            l_res_gnd_truth, l_obs_trash = self.my_cft.convert_cpp_file(self.simulated_dir_name, self.simulated_date,
+                                                                        self.simulated_files[i:i + 1],
+                                                                        use_classifier_result=False,
+                                                                        file_core_name=self.simulated_corename,
+                                                                        cut_after_cue=False)
             l_of_res['real_gnd_truth'] = np.array(l_res_gnd_truth).argmax(1)
 
             self.res_dict[rat][str(len(chg_obs))]['l_of_res'].append(l_of_res)
@@ -473,7 +477,7 @@ class Benchmark_Koho(Benchmark):
         self.classifier.init_networks(files, self.my_cft, train_mod_chan=True)
 
     def test_network_with_files(self, files):
-        l_res, l_obs = self.my_cft.read_cpp_files(files, is_healthy=False, cut_after_cue=False)
+        l_res, l_obs = self.my_cft.read_cpp_files(files, use_classifier_result=False, cut_after_cue=False)
         return self.test_network_with_obs(l_obs, l_res)
 
     def test_network_with_obs(self, l_obs, l_res):
@@ -482,7 +486,7 @@ class Benchmark_Koho(Benchmark):
         return l_of_res
 
     def train_with_file(self, files, new_day):
-        l_res, l_obs = self.my_cft.read_cpp_files(files, is_healthy=False, cut_after_cue=False)
+        l_res, l_obs = self.my_cft.read_cpp_files(files, use_classifier_result=False, cut_after_cue=False)
         self.train_with_obs(l_obs, l_res, new_day)
 
     def train_with_obs(self, l_obs, l_res, new_day):

@@ -161,7 +161,8 @@ class brain_state_calculate:
         else:
             self.mod_chan = range(self.chan_count)
 
-    def init_networks_on_files(self, initdir, cft, train_mod_chan=False):
+
+    def init_networks_on_files(self, initdir, cft, train_mod_chan=False, autosave=False):
         root = Tkinter.Tk()
         root.withdraw()
         file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=initdir, title="select cpp file to initialize the classifier")
@@ -172,6 +173,8 @@ class brain_state_calculate:
             self.init_networks(files, cft, train_mod_chan=train_mod_chan)
         except Exception:
             return -2
+        if autosave:
+            self.save_obj(files[-1]+str(time.time())+'.pyObj')
         return 0
 
     def init_test(self, HMM = True):

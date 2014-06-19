@@ -82,7 +82,7 @@ class Classifier_GUI(Tk):
         self.my_bsc = bsc.brain_state_calculate(int(self.sb_weight_count_param.get())/int(self.sb_group_by_param.get()), settings_path="classifierSettings2.yaml")
         self.init_cft()
         self.update_classifier()
-        res = self.my_bsc.init_networks_on_files(self.init_dir, self.my_cft, train_mod_chan=self.mod_chan_on.get())
+        res = self.my_bsc.init_networks_on_files(self.init_dir, self.my_cft, train_mod_chan=self.mod_chan_on.get(), autosave=True)
         print res
         if res >= 0:
             self.enable_all_button()

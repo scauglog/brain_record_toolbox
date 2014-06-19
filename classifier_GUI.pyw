@@ -105,7 +105,7 @@ class Classifier_GUI(Tk):
         self.update_classifier()
         self.my_bsc.test_classifier_on_file(self.my_cft, self.init_dir, on_modulate_chan=self.mod_chan_on.get(),
                                             gui=True, include_classifier_result=self.include_classifier_res.get(),
-                                            dir_path=self.init_dir, save_folder=self.save_folder)
+                                            save_folder=self.save_folder)
         self.enable_all_button()
 
     def plot_brain(self):

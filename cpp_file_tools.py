@@ -544,7 +544,10 @@ class cpp_file_tools:
 
         if self.save:
             plt.savefig(dir_path + 'result' + extra_txt + self.ext_img, dpi=100)
-        if not self.show:
+
+        if self.show:
+            plt.show()
+        else:
             if gui:
                 plt.clf()
             else:
@@ -559,7 +562,9 @@ class cpp_file_tools:
         if self.save:
             plt.savefig(dir_path+'obs'+extra_txt+self.ext_img)
 
-        if not self.show:
+        if self.show:
+            plt.show()
+        else:
             if gui:
                 plt.clf()
             else:

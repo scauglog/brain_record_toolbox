@@ -551,17 +551,16 @@ class brain_state_calculate:
             self.save_obj(paths[-1]+str(time.time())+'.pyObj')
         return 0
 
-    def test_classifier_on_file(self, cft, initdir, on_modulate_chan=False, gui=False, include_classifier_result=True,
-                                dir_path="", save_folder=""):
+    def test_classifier_on_file(self, cft, initdir, on_modulate_chan=False, gui=False, include_classifier_result=True, save_folder=""):
         root = Tkinter.Tk()
         root.withdraw()
         file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=initdir,  title="select cpp file to test the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
         if file_path == "":
             return -1
-        if save_folder == "":
-            save_folder = dir_path
-
         paths = root.tk.splitlist(file_path)
+        if save_folder == "":
+            save_folder = initdir
+
         for path in paths:
             l_res, l_obs = cft.read_cpp_files([path], use_classifier_result=False, cut_after_cue=False, init_in_walk=True)
             if len(l_obs) > 0:
@@ -569,6 +568,6 @@ class brain_state_calculate:
                 if include_classifier_result:
                     l_res, l_obs = cft.read_cpp_files([path], use_classifier_result=True, cut_after_cue=False, init_in_walk=True)
                     l_of_res["file_result"] = np.array(l_res).argmax(1)
-                cft.plot_result(l_of_res, big_figure=False, dir_path=save_folder, extra_txt=splitext(basename(path))[0], gui=gui)
+                cft.plot_result(l_of_res, big_figure=False, dir_path=save_folder, extra_txt=splitext(basename(path))[0]+str(time.time()), gui=gui)
             else:
                 print "empty file"

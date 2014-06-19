@@ -12,6 +12,7 @@ class cpp_file_tools:
         self.save = save
         self.show = show
         self.load_settings(settings_path)
+        plt.ion()
 
     def load_settings(self, settings_path):
         cftset = settings.Settings(settings_path).get()
@@ -566,3 +567,6 @@ class cpp_file_tools:
 
     def show_fig(self):
         plt.show()
+
+    def close_fig(self):
+        plt.close()

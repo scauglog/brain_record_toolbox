@@ -7,6 +7,9 @@ from Tkinter import *
 import ttk
 import tkFileDialog
 from os.path import basename, splitext
+from matplotlib import pyplot as plt
+from sklearn import decomposition
+
 
 class IORedirector(object):
     '''A general class for redirecting I/O to this Text widget.'''
@@ -66,7 +69,7 @@ class Classifier_GUI(Tk):
         self.quit()
 
     def load_classifier(self):
-        self.my_bsc = bsc.brain_state_calculate(32)
+        self.my_bsc = bsc.brain_state_calculate(32, settings_path="classifierSettings2.yaml")
         res = self.my_bsc.load_networks_file(self.init_dir)
         if res >= 0:
             self.enable_all_button()
@@ -76,7 +79,7 @@ class Classifier_GUI(Tk):
 
     def create_classifier(self):
         self.disable_all_button()
-        self.my_bsc = bsc.brain_state_calculate(int(self.sb_weight_count_param.get())/int(self.sb_group_by_param.get()))
+        self.my_bsc = bsc.brain_state_calculate(int(self.sb_weight_count_param.get())/int(self.sb_group_by_param.get()), settings_path="classifierSettings2.yaml")
         self.init_cft()
         self.update_classifier()
         res = self.my_bsc.init_networks_on_files(self.init_dir, self.my_cft, train_mod_chan=self.mod_chan_on.get())
@@ -100,28 +103,10 @@ class Classifier_GUI(Tk):
         if self.save_folder == "" or self.save_folder == "/":
             self.select_save_folder()
         self.update_classifier()
-        file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=self.init_dir,  title="select cpp file to test the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
-        if file_path == "":
-            self.enable_all_button()
-            return -1
-
-        paths = self.splitlist(file_path)
-        for path in paths:
-            l_res, l_obs = self.my_cft.read_cpp_files([path], use_classifier_result=False, cut_after_cue=False,
-                                                      init_in_walk=True, on_stim=self.stim_on.get())
-            if len(l_obs) > 0:
-                success, l_of_res = self.my_bsc.test(l_obs, l_res, on_modulate_chan=self.mod_chan_on.get())
-                if self.include_classifier_res.get():
-                    l_res, l_obs = self.my_cft.read_cpp_files([path], use_classifier_result=True, cut_after_cue=False,
-                                                              init_in_walk=True, on_stim=self.stim_on.get())
-                    l_of_res["file_result"] = np.array(l_res).argmax(1)
-                self.my_cft.plot_result(l_of_res, big_figure=False, dir_path=self.save_folder, extra_txt=splitext(basename(path))[0], gui=True)
-            else:
-                print "empty file"
-
+        self.my_bsc.test_classifier_on_file(self.my_cft, self.init_dir, on_modulate_chan=self.mod_chan_on.get(),
+                                            gui=True, include_classifier_result=self.include_classifier_res.get(),
+                                            dir_path=self.init_dir, save_folder=self.save_folder)
         self.enable_all_button()
-        if self.show_fig.get():
-            self.my_cft.show_fig()
 
     def plot_brain(self):
         self.disable_all_button()
@@ -138,7 +123,7 @@ class Classifier_GUI(Tk):
             if self.quantile_shrink.get():
                 tmp_l_obs = []
                 for obs in l_obs:
-                    tmp_l_obs.append(self.my_bsc.obs_to_quantiles(obs,self.mod_chan_on.get()))
+                    tmp_l_obs.append(self.my_bsc.obs_to_quantiles(obs, self.mod_chan_on.get()))
                 l_obs = tmp_l_obs
             if len(l_obs) > 0:
                 self.my_cft.plot_obs(l_obs, l_res, dir_path=self.save_folder,  extra_txt=splitext(basename(path))[0], gui=True)
@@ -146,8 +131,50 @@ class Classifier_GUI(Tk):
                 print "empty file"
 
         self.enable_all_button()
-        if self.show_fig.get():
-            self.my_cft.show_fig()
+
+    def set_classifier_pca(self):
+        nw = []
+        for row in self.my_bsc.koho[0].network:
+            for n in row:
+                nw.append(n.weights)
+
+
+        for row in self.my_bsc.koho[1].network:
+            for n in row:
+                nw.append(n.weights)
+
+        nw = np.array(nw)
+
+        self.pca = decomposition.PCA(n_components=2)
+        self.pca.fit(nw)
+
+
+
+    def plot_classifier_pca(self):
+        try:
+            self.pca == None
+        except:
+            self.set_classifier_pca()
+
+        nw0 = []
+        nw1 = []
+        for row in self.my_bsc.koho[0].network:
+            for n in row:
+                nw0.append(n.weights)
+
+
+        for row in self.my_bsc.koho[1].network:
+            for n in row:
+                nw1.append(n.weights)
+
+        pca_nw0 = self.pca.transform(nw0)
+        pca_nw1 = self.pca.transform(nw1)
+
+        plt.figure()
+        plt.scatter(pca_nw0[:, 0], pca_nw0[:, 1], marker='x', c='b', label="rest")
+        plt.scatter(pca_nw1[:, 0], pca_nw1[:, 1], marker='x', c='g', label="walk")
+        plt.legend()
+        plt.show()
 
     def train_classifier(self):
         self.disable_all_button()
@@ -201,8 +228,6 @@ class Classifier_GUI(Tk):
                 print "empty file"
 
         self.enable_all_button()
-        if self.show_fig.get():
-            self.my_cft.show_fig()
 
 
     def update_param(self):
@@ -416,12 +441,20 @@ class Classifier_GUI(Tk):
         self.b_obs = Button(self.f_train_test_button, text="plot brain", command=self.plot_brain, state=DISABLED)
         self.b_obs.grid(row=1, column=0, pady=10)
 
+        #set classifier pca
+        self.b_set_pca_classifier = Button(self.f_train_test_button, text= "set classifier pca", command=self.set_classifier_pca, state=DISABLED)
+        self.b_set_pca_classifier.grid(row=2, column=0, pady=10)
+
+        #plot classifier pca
+        self.b_pca_classifier = Button(self.f_train_test_button, text="plot classifier pca", command=self.plot_classifier_pca, state=DISABLED)
+        self.b_pca_classifier.grid(row=3, column=0, pady=10)
+
         #train button
         self.b_train = Button(self.f_train_test_button, text="train classifier", command=self.train_classifier, state=DISABLED)
-        self.b_train.grid(row=2, column=0, pady=10)
+        self.b_train.grid(row=4, column=0, pady=10)
 
         self.b_train_test = Button(self.f_train_test_button, text="train and test", command=self.train_test, state=DISABLED)
-        self.b_train_test.grid(row=3, column=0, pady=10)
+        self.b_train_test.grid(row=5, column=0, pady=10)
 
     def enable_all_button(self):
         self.filemenu.entryconfig(2, state=NORMAL)
@@ -430,6 +463,8 @@ class Classifier_GUI(Tk):
         self.b_obs['state'] = NORMAL
         self.b_train_test['state'] = NORMAL
         self.b_update_classifier['state'] = NORMAL
+        self.b_pca_classifier['state'] = NORMAL
+        self.b_set_pca_classifier['state'] = NORMAL
         print "# # DONE # #"
 
     def disable_all_button(self):
@@ -438,6 +473,8 @@ class Classifier_GUI(Tk):
         self.b_obs['state'] = DISABLED
         self.b_train_test['state'] = DISABLED
         self.b_update_classifier['state'] = DISABLED
+        self.b_pca_classifier['state'] = DISABLED
+        self.b_set_pca_classifier['state'] = DISABLED
 
     def on_check_save_fig(self):
         if self.save_fig.get() == ON:

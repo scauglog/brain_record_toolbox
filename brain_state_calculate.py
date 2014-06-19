@@ -9,6 +9,7 @@ import Tkinter
 import tkFileDialog
 import settings
 import time
+from os.path import basename, splitext
 
 import kohonen_neuron_c as kn
 
@@ -181,6 +182,12 @@ class brain_state_calculate:
         self.HMM = HMM
         self.raw_res = 0
         self.result = 0
+
+    def set_HMM(self,HMM):
+        self.A = np.array(HMM)
+
+    def get_HMM(self):
+        return self.A.tolist()
 
     def test_one_obs(self, obs, on_modulate_chan=True):
         #we transform the obs according to our need
@@ -540,3 +547,25 @@ class brain_state_calculate:
         if autosave:
             self.save_obj(paths[-1]+str(time.time())+'.pyObj')
         return 0
+
+    def test_classifier_on_file(self, cft, initdir, on_modulate_chan=False, gui=False, include_classifier_result=True,
+                                dir_path="", save_folder=""):
+        root = Tkinter.Tk()
+        root.withdraw()
+        file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=initdir,  title="select cpp file to test the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
+        if file_path == "":
+            return -1
+        if save_folder == "":
+            save_folder = dir_path
+
+        paths = root.tk.splitlist(file_path)
+        for path in paths:
+            l_res, l_obs = cft.read_cpp_files([path], use_classifier_result=False, cut_after_cue=False, init_in_walk=True)
+            if len(l_obs) > 0:
+                success, l_of_res = self.test(l_obs, l_res, on_modulate_chan=on_modulate_chan)
+                if include_classifier_result:
+                    l_res, l_obs = cft.read_cpp_files([path], use_classifier_result=True, cut_after_cue=False, init_in_walk=True)
+                    l_of_res["file_result"] = np.array(l_res).argmax(1)
+                cft.plot_result(l_of_res, big_figure=False, dir_path=save_folder, extra_txt=splitext(basename(path))[0], gui=gui)
+            else:
+                print "empty file"

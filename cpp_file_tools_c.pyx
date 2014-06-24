@@ -1,11 +1,15 @@
+#!python
+#cython: boundscheck=False
+#cython: wraparound=False
+
 import csv
 import numpy as np
 import kohonen_neuron_c as kn
 from matplotlib import pyplot as plt
 import settings
 
-class cpp_file_tools:
-    def __init__(self, chan_count, group_chan, ext_img='.png', save=False, show=False, settings_path="cppfileSettings.yaml", ion=True):
+cdef class cpp_file_tools:
+    def __init__(self, int chan_count, int group_chan, ext_img='.png', save=False, show=False, settings_path="cppfileSettings.yaml", ion=True):
         self.chan_count = chan_count
         self.group_chan = group_chan
         self.ext_img = ext_img
@@ -47,6 +51,7 @@ class cpp_file_tools:
         self.result_col = cftset['result_col']
 
     def convert_one_cpp_file(self, filename, use_classifier_result=False, cut_after_cue=False, init_in_walk=True, on_stim=False):
+        cdef np.ndarray[DTYPE_t, ndim=1] brain_state
         #if is healthy the gnd truth is on col 4 else it's on col 6
         l_obs = []
         l_res = []
@@ -75,7 +80,7 @@ class cpp_file_tools:
         prevState = stop[0]
         #grab expected result in file and convert, grab input data
         for row in file:
-            if len(row) > self.first_chan and row[0] != '0':
+            if <int>len(row) > self.first_chan and row[0] != '0':
                 #if rat is healthy walk state are in col 4 otherwise in col 6 see 'howto file reading file'
                 if use_classifier_result:
                     ratState = row[self.result_col]
@@ -128,13 +133,16 @@ class cpp_file_tools:
             list.append(dir_name+date+file_core_name+str(f)+'.txt')
         return list
 
-    def convert_brain_state(self, obs):
+    cpdef np.ndarray convert_brain_state(self, object obs):
+        cdef np.ndarray[DTYPE_t, ndim=1] obs_converted
+        cdef double res
+        cdef int i
         #convert what we read in the file to correct brain state
-        obs_converted = np.arange(0, len(obs)/self.group_chan, 1.0)
+        obs_converted = <np.ndarray[DTYPE_t, ndim=1]>np.arange(0, len(obs)/self.group_chan, 1.0)
         #sum chan X by X (X=self.group_chan)
         res = 0.0
-        for i in range(len(obs)):
-            res += float(obs[i])
+        for i in range(<int>len(obs)):
+            res += <double>float(obs[i])
             if (i+1) % self.group_chan == 0:
                 obs_converted[i/self.group_chan] = res
                 res = 0.0
@@ -148,93 +156,98 @@ class cpp_file_tools:
 
     def obs_classify(self, l_obs, l_res):
         #classify obs using the cue
+        cdef int i
         l_obs_stop = []
         l_obs_walk = []
-        for i in range(len(l_res)):
+        for i in range(<int>len(l_res)):
             if l_res[i] == self.stop:
-                l_obs_stop.append(l_obs[i])
+                l_obs_stop.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[i])
             elif l_res[i] == self.walk:
-                l_obs_walk.append(l_obs[i])
+                l_obs_walk.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[i])
         return [l_obs_stop, l_obs_walk]
 
     def obs_classify_good_res(self, l_obs, l_res, l_calc_res, obs_to_add=0):
         #add obs only if the network give the good answer
+        cdef int i
         l_obs_stop = []
         l_obs_walk = []
-        for i in range(1, len(l_res)-1):
+        for i in range(1, <int>len(l_res)-1):
             if l_res[i] == self.stop and l_calc_res[i] == self.stop_index:
-                l_obs_stop.append(l_obs[i])
+                l_obs_stop.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[i])
                 #when we change state and this is a good idea brain state before and after should be same state
                 self.add_extra_obs(l_obs, l_res, obs_to_add, l_calc_res, i, self.stop, l_obs_stop)
 
             elif l_res[i] == self.walk and l_calc_res[i] == self.walk_index:
-                l_obs_walk.append(l_obs[i])
+                l_obs_walk.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[i])
                 self.add_extra_obs(l_obs, l_res, obs_to_add, l_calc_res, i, self.walk, l_obs_walk)
 
         return [l_obs_stop, l_obs_walk]
 
     def obs_classify_bad_res(self, l_obs, l_res, l_calc_res, obs_to_add=0):
         #add obs only if the network give the bad answer
+        cdef int i
         l_obs_stop = []
         l_obs_walk = []
-        for i in range(1, len(l_res)-1):
+        for i in range(1, <int>len(l_res)-1):
             if l_res[i] == self.stop and l_calc_res[i] == self.walk_index:
-                l_obs_stop.append(l_obs[i])
+                l_obs_stop.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[i])
                 self.add_extra_obs(l_obs, l_res, obs_to_add, l_calc_res, i, self.stop, l_obs_stop)
             elif l_res[i] == self.walk and l_calc_res[i] == self.stop_index:
-                l_obs_walk.append(l_obs[i])
+                l_obs_walk.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[i])
                 self.add_extra_obs(l_obs, l_res, obs_to_add, l_calc_res, i, self.walk, l_obs_walk)
 
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_mixed_res(self, l_obs, l_res, l_calc_res, obs_to_add=0):
+    def obs_classify_mixed_res(self, l_obs, l_res, l_calc_res, int obs_to_add=0):
         #add obs to stop when no cue and to walk only if the network give the right answer
+        cdef int i
         l_obs_stop = []
         l_obs_walk = []
         #list_of_res
         #0 = res expected
         #1 = res calculate before HMM
         #2 = res calculate after HMM
-        for i in range(1, len(l_res)-1):
+        for i in range(1, <int>len(l_res)-1):
             if l_res[i] == self.stop:
-                l_obs_stop.append(l_obs[i])
+                l_obs_stop.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[i])
 
-            elif l_res[i] == self.walk and l_calc_res[i] == self.walk_index:
-                l_obs_walk.append(l_obs[i])
+            elif l_res[i] == self.walk and <int>l_calc_res[i] == self.walk_index:
+                l_obs_walk.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[i])
                 self.add_extra_obs(l_obs, l_res, obs_to_add, l_calc_res, i, self.walk, l_obs_walk)
 
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_prev_res(self, l_obs, l_calc_res, obs_to_add=0):
+    def obs_classify_prev_res(self, l_obs, l_calc_res, int obs_to_add=0):
         #we class obs using only the previous result no ground truth involved here
         #we need ground truth to call test
+        cdef int i, n
         l_obs_stop = []
         l_obs_walk = []
         #when obs_to add is <0 we remove obs
         obs_to_remove = []
-        for i in range(1, len(l_obs)-1):
-            if l_calc_res[i] == self.stop_index:
-                l_obs_stop.append(l_obs[i])
-            elif l_calc_res[i] == self.walk_index:
-                l_obs_walk.append(l_obs[i])
+        for i in range(1, <int>len(l_obs)-1):
+            if <int>l_calc_res[i] == self.stop_index:
+                l_obs_stop.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[i])
+            elif <int>l_calc_res[i] == self.walk_index:
+                l_obs_walk.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[i])
                 #when state change
-                if l_calc_res[i] != l_calc_res[i+1]:
+                if <int>l_calc_res[i] != <int>l_calc_res[i+1]:
                     if obs_to_add > 0:
                         for n in range(i-obs_to_add, i):
-                            if 0 < n < len(l_obs):
-                                l_obs_walk.append(l_obs[n])
+                            if 0 < n < <int>len(l_obs):
+                                l_obs_walk.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[n])
                         for n in range(i, i+obs_to_add):
-                            if 0 < n < len(l_obs):
-                                l_obs_walk.append(l_obs[n])
+                            if 0 < n < <int>len(l_obs):
+                                l_obs_walk.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[n])
                     elif obs_to_add < 0:
-                        for n in range(i, i+abs(obs_to_add)):
-                            if 0 < n < len(l_obs):
-                                obs_to_remove.append(l_obs[n])
-                        for n in range(i-abs(obs_to_add), i):
-                            if 0 < n < len(l_obs):
-                                obs_to_remove.append(l_obs[n])
+                        for n in range(i, i+<int>abs(obs_to_add)):
+                            if 0 < n < <int>len(l_obs):
+                                obs_to_remove.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[n])
+                        for n in range(i-<int>abs(obs_to_add), i):
+                            if 0 < n < <int>len(l_obs):
+                                obs_to_remove.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[n])
         #remove obs when obs_to_add <0
-        if len(obs_to_remove) > 0:
+        if <int>len(obs_to_remove) > 0:
             tmp_l = []
             for obs in l_obs_walk:
                 to_add = True
@@ -247,13 +260,18 @@ class cpp_file_tools:
             l_obs_walk = tmp_l
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_kohonen(self, l_obs, acceptance_factor=0.0):
+    def obs_classify_kohonen(self, l_obs, double acceptance_factor=0.0):
         print('###### classify with kohonen ######')
+        cdef int n, i, stop, walk, nb_stop, nb_walk
+        cdef kn.Kohonen net
+        cdef np.ndarray[DTYPE_t, ndim=1] obs
+        cdef kn.Group_neuron gp
+
         while True:
             #while the network don't give 2 classes
             n = 0
             while True:
-                net = kn.Kohonen(self.kc_col, self.kc_row, l_obs[0].shape[0], self.kc_max_weight, self.kc_alpha, self.kc_neighbor, self.kc_min_win, self.ext_img, False, False)
+                net = kn.Kohonen(self.kc_col, self.kc_row, <int>l_obs[0].shape[0], self.kc_max_weight, self.kc_alpha, self.kc_neighbor, self.kc_min_win, self.ext_img, False, False)
 
                 for i in range(10):
                     net.algo_kohonen(l_obs, False)
@@ -262,7 +280,7 @@ class cpp_file_tools:
                 net.evaluate_neurons(l_obs)
                 net.group_neuron_into_x_class(2)
                 n+=1
-                if len(net.groups) == 2:
+                if <int>len(net.groups) == 2:
                     break
                 elif n > 4:
                     #when we still don't have a valid number of class after many trials we raise an exception
@@ -273,55 +291,57 @@ class cpp_file_tools:
             #test the networks to know which group is stop and which is walk
             dict_res = {}
             for gp in net.groups:
-                dict_res[gp.number] = []
+                dict_res[<int>gp.number] = []
 
             for obs in l_obs:
-                gp = net.find_best_group(obs)
-                dict_res[gp.number].append(obs)
+                gp = net.find_best_group(<np.ndarray[DTYPE_t, ndim=1]>obs)
+                dict_res[<int>gp.number].append(<np.ndarray[DTYPE_t, ndim=1]>obs)
 
             #stop have more observation than walk
             keys = dict_res.keys()
             print(keys)
-            if len(keys) == 2:
-                if len(dict_res[keys[0]]) > len(dict_res[keys[1]]):
-                    stop = keys[0]
-                    walk = keys[1]
+            if <int>len(keys) == 2:
+                if <int>len(dict_res[keys[0]]) > <int>len(dict_res[keys[1]]):
+                    stop = <int>keys[0]
+                    walk = <int>keys[1]
                 else:
-                    stop = keys[1]
-                    walk = keys[0]
+                    stop = <int>keys[1]
+                    walk = <int>keys[0]
 
                 l_obs_koho = [dict_res[stop], dict_res[walk]]
-                nb_stop = len(dict_res[stop])
-                nb_walk = len(dict_res[walk])
+                nb_stop = <int>len(dict_res[stop])
+                nb_walk = <int>len(dict_res[walk])
                 print('nb stop', nb_stop, 'nb_walk', nb_walk, nb_walk/float(nb_stop))
-                if acceptance_factor > 0 and (acceptance_factor < nb_walk/float(nb_stop) < 1.5) or (nb_walk + nb_stop < 150 and nb_walk > 20):
+                if acceptance_factor > 0.0 and (acceptance_factor < nb_walk/float(nb_stop) < 1.5) or (nb_walk + nb_stop < 150 and nb_walk > 20):
                     return l_obs_koho
-                elif acceptance_factor == 0:
+                elif acceptance_factor == 0.0:
                     return l_obs_koho
             else:
                 return [[], []]
 
     @staticmethod
-    def add_extra_obs(l_obs, l_res, obs_to_add, calculate_res, i, res_expected, l_obs_state):
+    def add_extra_obs(l_obs, l_res, int obs_to_add, calculate_res, int i, res_expected, l_obs_state):
         #when the brain state change we add value before or after the observed state
+        cdef int n
+        cdef np.ndarray[DTYPE_t, ndim=1] obs
         obs_to_remove=[]
-        if 1 < i < len(l_res)-1:
-            if calculate_res[i-1] != calculate_res[i]:
+        if 1 < i < <int>len(l_res)-1:
+            if <int>calculate_res[i-1] != <int>calculate_res[i]:
                 if obs_to_add > 0:
                     for n in range(i-obs_to_add, i):
-                        if 0 < n < len(l_res) and l_res[n] == res_expected:
-                            l_obs_state.append(l_obs[n])
+                        if 0 < n < <int>len(l_res) and l_res[n] == res_expected:
+                            l_obs_state.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[n])
                     for n in range(i, i+obs_to_add):
-                        if 0 < n < len(l_res) and l_res[n] == res_expected:
-                            l_obs_state.append(l_obs[n])
+                        if 0 < n < <int>len(l_res) and l_res[n] == res_expected:
+                            l_obs_state.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[n])
                 elif obs_to_add < 0:
-                    for n in range(i-abs(obs_to_add), i):
-                        if 0 < n < len(l_res):
-                            obs_to_remove.append(l_obs[n])
-                    for n in range(i, i+abs(obs_to_add)):
-                        if 0 < n < len(l_res):
-                            obs_to_remove.append(l_obs[n])
-        if len(obs_to_remove) > 0:
+                    for n in range(i-<int>abs(obs_to_add), i):
+                        if 0 < n < <int>len(l_res):
+                            obs_to_remove.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[n])
+                    for n in range(i, i+<int>abs(obs_to_add)):
+                        if 0 < n < <int>len(l_res):
+                            obs_to_remove.append(<np.ndarray[DTYPE_t, ndim=1]>l_obs[n])
+        if <int>len(obs_to_remove) > 0:
             tmp_l = []
             for obs in l_obs_state:
                 to_add = True
@@ -336,12 +356,13 @@ class cpp_file_tools:
     #classify the given result
     @staticmethod
     def class_result(l_res, l_expected_res):
+        cdef int current_walk, i
         walk_before_cue = []
         walk_after_cue = []
         current_walk = 0
-        for i in range(len(l_res)):
+        for i in range(1, <int>len(l_res)):
             #when we are at the end of the walk or cue change and we walk
-            if i > 0 and (l_res[i] != l_res[i-1] or l_expected_res[i] != l_expected_res[i-1]) and l_res[i] == 0:
+            if (<int>l_res[i] != <int>l_res[i-1] or <int>l_expected_res[i] != <int>l_expected_res[i-1]) and <int>l_res[i] == 0:
                 if current_walk != 0:
                     if l_expected_res[i-1] == 0:
                         walk_before_cue.append(current_walk)
@@ -351,11 +372,12 @@ class cpp_file_tools:
 
             if l_res[i] == 1:
                current_walk += 1
-
-        return walk_before_cue, walk_after_cue
+        return np.array(walk_before_cue), np.array(walk_after_cue)
 
     #classify the given result
     def compare_result(self, l_res1, l_res2, l_expected_res, no_perfect=False):
+        cdef double block_length, min_walk, long_walk, short_walk, success_rate1, success_rate2
+        cdef int win_point1, win_point2, all_w1_max, all_w2_max
         w_before_cue1, w_after_cue1 = self.class_result(l_res1, l_expected_res)
         w_before_cue2, w_after_cue2 = self.class_result(l_res2, l_expected_res)
         block_length = 0.1
@@ -366,26 +388,21 @@ class cpp_file_tools:
         win_point2 = 0
         success_rate1 = 0
         success_rate2 = 0
+        all_w1 =  np.hstack((w_before_cue1, w_after_cue1))
+        all_w2 =  np.hstack((w_before_cue2, w_after_cue2))
 
-        all_w1 = np.array(w_before_cue1 + w_after_cue1)
-        all_w2 = np.array(w_before_cue2 + w_after_cue2)
-
-        w_before_cue1 = np.array(w_before_cue1)
-        w_before_cue2 = np.array(w_before_cue2)
-        w_after_cue1 = np.array(w_after_cue1)
-        w_after_cue2 = np.array(w_after_cue2)
-        long_w1 = w_after_cue1[w_after_cue1 > long_walk]
-        long_w2 = w_after_cue2[w_after_cue2 > long_walk]
-        short_w1 = w_after_cue1[w_after_cue1 < short_walk]
-        short_w2 = w_after_cue2[w_after_cue2 < short_walk]
+        long_w1 =  w_after_cue1[w_after_cue1 > long_walk]
+        long_w2 =  w_after_cue2[w_after_cue2 > long_walk]
+        short_w1 =  w_after_cue1[w_after_cue1 < short_walk]
+        short_w2 =  w_after_cue2[w_after_cue2 < short_walk]
 
         #good training have one long walk
         #who has less long walk but at least one
-        if 0 < long_w1.shape[0] < long_w2.shape[0]:
+        if 0 < <int>long_w1.shape[0] < <int>long_w2.shape[0]:
             win_point1 += 1
-        elif 0 < long_w2.shape[0] < long_w1.shape[0]:
+        elif 0 < <int>long_w2.shape[0] < <int>long_w1.shape[0]:
             win_point2 += 1
-        elif long_w1.shape[0] < 1 and long_w1.shape[0] < 1:
+        elif <int>long_w1.shape[0] < 1 and <int>long_w1.shape[0] < 1:
             win_point1 -= 1
             win_point2 -= 1
         else:
@@ -393,23 +410,24 @@ class cpp_file_tools:
             win_point2 += 2
 
         #who has less short walk
-        if short_w1.shape[0] < short_w2.shape[0]:
+        if <int>short_w1.shape[0] < <int>short_w2.shape[0]:
             win_point1 += 1
-        elif short_w2.shape[0] < short_w1.shape[0]:
+        elif <int>short_w2.shape[0] < <int>short_w1.shape[0]:
             win_point2 += 1
         else:
             win_point1 += 1
             win_point2 += 1
 
+        cdef double wbc1_mean, wbc2_mean, wdc1_mean, wdc2_mean
         #before cue fav short walk
         #init mean cause array.mean() return none if array is empty
-        if w_before_cue1.shape[0] > 0:
-            wbc1_mean = w_before_cue1.mean()
+        if <int>w_before_cue1.shape[0] > 0:
+            wbc1_mean = <double>w_before_cue1.mean()
         else:
             wbc1_mean = 0
 
-        if w_before_cue2.shape[0] > 0:
-            wbc2_mean = w_before_cue2.mean()
+        if <int>w_before_cue2.shape[0] > 0:
+            wbc2_mean = <double>w_before_cue2.mean()
         else:
             wbc2_mean = 0
 
@@ -423,13 +441,13 @@ class cpp_file_tools:
 
         #during cue fav long walk
         #init mean cause array.mean() return none if array is empty
-        if w_after_cue1.shape[0] > 0:
-            wdc1_mean = w_after_cue1.mean()
+        if <int>w_after_cue1.shape[0] > 0:
+            wdc1_mean = <double>w_after_cue1.mean()
         else:
             wdc1_mean = 0
 
-        if w_after_cue2.shape[0] > 0:
-            wdc2_mean = w_after_cue2.mean()
+        if <int>w_after_cue2.shape[0] > 0:
+            wdc2_mean = <double>w_after_cue2.mean()
         else:
             wdc2_mean = 0
 
@@ -443,12 +461,12 @@ class cpp_file_tools:
 
         #who has the longest walk
         #init max cause array.max() return none if array is empty
-        if all_w1.shape[0] > 0:
-            all_w1_max = all_w1.max()
+        if <int>all_w1.shape[0] > 0:
+            all_w1_max = <int>all_w1.max()
         else:
             all_w1_max = 0
-        if all_w2.shape[0] > 0:
-            all_w2_max = all_w2.max()
+        if <int>all_w2.shape[0] > 0:
+            all_w2_max = <int>all_w2.max()
         else:
             all_w2_max = 0
 
@@ -461,68 +479,71 @@ class cpp_file_tools:
             win_point2 += 1
 
         #less walk time before cue
-        if w_before_cue1.sum() < w_before_cue2.sum():
+        if <int>w_before_cue1.sum() < <int>w_before_cue2.sum():
             win_point1 += 1
-        elif w_before_cue2.sum() < w_before_cue1.sum():
+        elif <int>w_before_cue2.sum() < <int>w_before_cue1.sum():
             win_point2 += 1
         else:
             win_point1 += 1
             win_point2 += 1
 
         #no walk before cue is good
-        if w_before_cue1.shape[0] == 0:
+        if <int>w_before_cue1.shape[0] == 0:
             win_point1 += 1
-        if w_before_cue2.shape[0] == 0:
+        if <int>w_before_cue2.shape[0] == 0:
             win_point2 += 1
 
         #at least min_walk of walk
-        if all_w1.sum() > min_walk:
+        if <int>all_w1.sum() > min_walk:
             win_point1 += 1
-        if all_w2.sum() > min_walk:
+        if <int>all_w2.sum() > min_walk:
             win_point2 += 1
 
         if no_perfect:
             return win_point1, win_point2
         else:
             #his this trial perfect (no walk before cue, at least X second of walk)
-            if w_before_cue1.shape[0] == 0:
+            if <int>w_before_cue1.shape[0] == 0:
                 success_rate1 = min(1, all_w1.sum() / float(min_walk))
-            if w_before_cue2.shape[0] == 0:
+            if <int>w_before_cue2.shape[0] == 0:
                 success_rate2 = min(1, all_w2.sum() / float(min_walk))
 
             return win_point1, win_point2, success_rate1, success_rate2
 
-    def success_rate(self, l_res, l_expected_res):
+    cpdef double success_rate(self, object l_res, object l_expected_res):
         #if there is no walk when we want rest and at least X second of walk
+        cdef double block_length, min_walk
         block_length = 0.1
         min_walk = 3/block_length
         w_before_cue, w_after_cue = self.class_result(l_res, l_expected_res)
-        if w_before_cue.shape[0] == 0:
+        if <int>w_before_cue.shape[0] == 0:
             return min(1.0, w_after_cue.sum()/float(min_walk))
         else:
             return 0
 
-    def accuracy(self, l_res, l_expected_res):
+    cpdef double accuracy(self, l_res, l_expected_res):
         #mean of (%success when we want walk + %success when we want rest)
+        cdef double walk_success, walk_total, rest_sucess, rest_total
+        cdef int i
         walk_success = 0.0
         walk_total = 0.0
         rest_success = 0.0
         rest_total = 0.0
-        for i in range(len(l_res)):
-            if l_expected_res[i] == self.walk_index:
+        for i in range(<int>len(l_res)):
+            if <int>l_expected_res[i] == self.walk_index:
                 walk_total += 1
-                if l_res[i] == self.walk_index:
+                if <int>l_res[i] == self.walk_index:
                     walk_success += 1
-            elif l_expected_res[i] == self.stop_index:
+            elif <int>l_expected_res[i] == self.stop_index:
                 rest_total += 1
-                if l_res[i] == self.stop_index:
+                if <int>l_res[i] == self.stop_index:
                     rest_success += 1
         if walk_total > 0 and rest_total > 0:
             return (walk_success/walk_total+rest_success/rest_total)/2
         elif walk_total > 0 and rest_total < 0:
-            return walk_success/walk_total
+            return (walk_success/walk_total)/2
         elif rest_total > 0 and walk_total < 0:
-            return rest_success/rest_total
+            return (rest_success/rest_total)/2
         else:
             return 0
 

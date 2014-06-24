@@ -60,12 +60,14 @@ cdef class Neurone:
     cpdef double calc_error(self, np.ndarray[DTYPE_t, ndim=1] obs):
         cdef double error_sum = 0.0
         cdef int i
+        #error_sum = ((self.weights-obs)**2).sum()
         for i in range(<int> self.weight_count):
             error_sum += (<double>self.weights[i] - <double>obs[i]) ** 2
         return <double> math.sqrt(error_sum)
 
     def change_weights(self,double dist, np.ndarray[DTYPE_t, ndim=1] obs, double alpha):
         cdef int i
+        #self.weights -= alpha/dist *(self.weights - obs)
         for i in range(<int> self.weight_count):
             #if the neuron is not the best neuron dist > 1, dist is the neighborhood distance
             self.weights[i] -= alpha * ((<double> self.weights[i] - <double> obs[i]) * 1 / dist)
@@ -546,7 +548,7 @@ cdef class Group_neuron:
         self.compute_template()
 
     def compute_template(self):
-        cdef np.ndarray sum_template = <np.ndarray[DTYPE_t, ndim=1]> self.template * 0
+        cdef np.ndarray[DTYPE_t, ndim=1] sum_template = <np.ndarray[DTYPE_t, ndim=1]> self.template * 0
         cdef int count = 0
         cdef Neurone n
         for n in self.neurons:

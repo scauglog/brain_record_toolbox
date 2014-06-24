@@ -1,3 +1,6 @@
+#!python
+#cython: boundscheck=False
+
 import numpy as np
 import copy
 import random as rnd
@@ -10,12 +13,10 @@ import tkFileDialog
 import settings
 import time
 from os.path import basename, splitext
-
 import kohonen_neuron_c as kn
 
-
-class brain_state_calculate:
-    def __init__(self, weight_count, name='koho', ext_img='.png', save=False, show=False, settings_path="classifierSettings.yaml"):
+cdef class brain_state_calculate:
+    def __init__(self, int weight_count, name='koho', ext_img='.png', save=False, show=False, settings_path="classifierSettings.yaml"):
         self.ext_img = ext_img
         self.save = save
         self.show = show
@@ -84,6 +85,7 @@ class brain_state_calculate:
 
     def build_networks(self):
         #build the network
+        cdef kn.Kohonen koho_stop, koho_walk
         koho_stop = kn.Kohonen(self.koho_row, self.koho_col, self.weight_count, self.max_weight, self.alpha, self.neighbor, self.min_win, self.ext_img, self.save, self.show, rnd.random())
         koho_walk = kn.Kohonen(self.koho_row, self.koho_col, self.weight_count, self.max_weight, self.alpha, self.neighbor, self.min_win, self.ext_img, self.save, self.show, rnd.random())
         self.koho = [koho_stop, koho_walk]
@@ -161,7 +163,6 @@ class brain_state_calculate:
         else:
             self.mod_chan = range(self.chan_count)
 
-
     def init_networks_on_files(self, initdir, cft, train_mod_chan=False, autosave=False):
         root = Tkinter.Tk()
         root.withdraw()
@@ -192,23 +193,28 @@ class brain_state_calculate:
     def get_HMM(self):
         return self.A.tolist()
 
-    def test_one_obs(self, obs, on_modulate_chan=True):
+    cpdef int test_one_obs(self, object tmp_obs, object on_modulate_chan=True):
+        cdef np.ndarray[DTYPE_t, ndim=1] dist_res, P, obs
+        cdef int k, i, rank
+        #we should tranform
+        obs = <np.ndarray[DTYPE_t, ndim=1]> np.array(tmp_obs)
         #we transform the obs according to our need
         if on_modulate_chan and not self.use_obs_quantile:
             obs = self.get_only_mod_chan(obs)
         if self.use_obs_quantile:
             obs = self.obs_to_quantiles(obs, on_modulate_chan=on_modulate_chan)
         #test one obs
-        dist_res = np.arange(0, len(self.koho), 1.0)
+        dist_res = np.arange(0, <int>len(self.koho), 1.0)
         best_ns = []
         res = copy.copy(self.default_res)
 
         #find the best distance of the obs to each network
-        for k in range(len(self.koho)):
+        for k in range(<int>len(self.koho)):
             dist_res[k] = self.koho[k].find_mean_best_dist(obs, self.dist_count)
             #we add extra neurons to best_ns in order to remove null probability
             best_ns += self.koho[k].find_best_X_neurons(obs, self.dist_count+self.dist_count)
-        self.raw_res = dist_res.argmin()
+
+        self.raw_res = <int>dist_res.argmin()
         if self.HMM:
             #flatten list
             #best_ns = [item for sublist in best_ns for item in sublist]
@@ -217,13 +223,13 @@ class brain_state_calculate:
 
             #compute result with HMM
             P = np.arange(0, prob_res.shape[0], 1.0)
-            for i in range(prob_res.shape[0]):
-                P[i]=self.prevP.T.dot(self.A[:, i])*prob_res[i]
+            for i in range(<int>prob_res.shape[0]):
+                P[i]=<double>self.prevP.T.dot(self.A[:, i])*prob_res[i]
             #repair sum(P) == 1
             P = P.T/P.sum()
 
             #transform in readable result
-            rank = P.argmax()
+            rank = <int>P.argmax()
             res[rank] = 1
 
             #save P.T
@@ -231,46 +237,48 @@ class brain_state_calculate:
         else:
             print "no HMM"
             #transform in readable result
-            rank = dist_res.argmin()
+            rank = <int>dist_res.argmin()
             res[rank] = 1
 
         #use history to smooth change
         if self.history_length > 1:
             self.history = np.vstack((self.history, res))
-            if self.history.shape[0] > self.history_length:
+            if <int>self.history.shape[0] > self.history_length:
                 self.history = self.history[1:, :]
 
             #transform in readable result
-            rank = self.history.mean(0).argmax()
+            rank = <int>self.history.mean(0).argmax()
 
         self.result=rank
         return rank
 
     def test(self, l_obs, l_res, on_modulate_chan=True):
+        cdef int good, i
         good = 0
 
         #matrix which contain the rank of the result
         results_dict={'gnd_truth':[], self.name+'_raw':[], self.name:[]}
         self.init_test()
 
-        for i in range(len(l_obs)):
+        for i in range(<int>len(l_obs)):
             self.test_one_obs(l_obs[i], on_modulate_chan)
             results_dict[self.name+'_raw'].append(self.raw_res)
             results_dict[self.name].append(self.result)
-            results_dict['gnd_truth'].append(np.array(l_res[i]).argmax())
-            if self.result == np.array(l_res[i]).argmax():
+            results_dict['gnd_truth'].append(<int>np.array(l_res[i]).argmax())
+            if self.result == <int>np.array(l_res[i]).argmax():
                 good += 1
 
-        if len(l_obs) > 0:
-            return good/float(len(l_obs)), results_dict
+        if <int>len(l_obs) > 0:
+            return <double>good/float(len(l_obs)), results_dict
         else:
             print('l_obs is empty')
-            return 0, {}
+            return <double>0.0, {}
 
     def get_only_mod_chan(self, obs):
+        cdef int c
         obs_mod = copy.copy(np.array(map(float, obs)))
         #keep only chan that where modulated
-        for c in range(obs_mod.shape[0]):
+        for c in range(<int>obs_mod.shape[0]):
             if c not in self.mod_chan:
                 obs_mod[c] = 0
         return obs_mod
@@ -281,37 +289,41 @@ class brain_state_calculate:
         else:
             return mquantiles(obs, self.qVec)
 
-    def compute_network_accuracy(self, best_ns, dist_res, obs):
+    cpdef np.ndarray compute_network_accuracy(self, object best_ns, object dist_res, np.ndarray obs):
         #we test combination of each best n
         #return an array of probability (prob of the obs to be state X)
-        dist_comb = []
+        cdef np.ndarray prob_res, dist_comb
+        cdef int k
+        cdef double prob
+        cdef kn.Neurone n
+        l_dist_comb = []
         if self.test_all:
             #test all combinations
             all_comb = combinations(best_ns, self.dist_count)
             for c in all_comb:
                 l_dist = []
                 for n in c:
-                    l_dist.append(n.calc_error(obs))
-                dist_comb.append(np.array(l_dist).mean())
+                    l_dist.append(<double>n.calc_error(obs))
+                l_dist_comb.append(<double>np.array(l_dist).mean())
         else:
             #test some combinations
             for c in range(self.combination_to_test):
                 l_dist = []
                 for n in self.random_combination(best_ns, self.dist_count):
-                    l_dist.append(n.calc_error(obs))
-                dist_comb.append(np.array(l_dist).mean())
+                    l_dist.append(<double>n.calc_error(obs))
+                l_dist_comb.append(<double>np.array(l_dist).mean())
 
-        prob_res = np.arange(0, len(self.koho), 1.0)
+        prob_res = <np.ndarray[DTYPE_t, ndim=1]> np.arange(0, <int>len(self.koho), 1.0)
         #sort each dist for combination and find where the result of each network is in the sorted list
         #this give a percentage of accuracy for the network
-        dist_comb = np.array(sorted(dist_comb, reverse=True))
-        for k in range(len(self.koho)):
-            prob = abs(dist_comb-dist_res[k]).argmin()/float(len(dist_comb))
+        dist_comb = <np.ndarray[DTYPE_t, ndim=1]> np.array(sorted(l_dist_comb, reverse=True))
+        for k in range(<int>len(self.koho)):
+            prob = <double>abs(dist_comb-dist_res[k]).argmin()/float(len(dist_comb))
             if prob == 0.0:
                 prob = 0.01
             prob_res[k] = prob
 
-        return np.array(prob_res)
+        return prob_res
 
     def compute_network_accuracy_p(self, best_ns, obs):
         #return an array of probability (prob of the obs to be state X)
@@ -342,15 +354,18 @@ class brain_state_calculate:
 
     @staticmethod
     def random_combination(iterable, r):
+        cdef int i, n
         #"Random selection from itertools.combinations(iterable, r)"
         pool = tuple(iterable)
-        n = len(pool)
+        n = <int>len(pool)
         indices = sorted(rnd.sample(xrange(n), r))
         return tuple(pool[i] for i in indices)
 
-    def simulated_annealing(self, l_obs, l_obs_koho, l_res, alpha_start, max_iteration, max_success, over_train_walk=False):
+    def simulated_annealing(self, l_obs, l_obs_koho, l_res, double alpha_start, int max_iteration, int max_success, over_train_walk=False):
         #inspired from simulated annealing, to determine when we should stop learning
         #initialize
+        cdef double success, success_cp, alpha
+        cdef int n, i, cpt
         success, lor_trash = self.test(l_obs, l_res, on_modulate_chan=False)
         success -= 0.1
         alpha = alpha_start
@@ -359,7 +374,7 @@ class brain_state_calculate:
             print(success)
             koho_cp = copy.copy(self.koho)
             #train each kohonen network
-            for i in range(len(koho_cp)):
+            for i in range(<int>len(koho_cp)):
                 #update learning coefficient
                 koho_cp[i].alpha = alpha
                 #no neighbor decrease for the first iteration
@@ -370,18 +385,18 @@ class brain_state_calculate:
             #we train walk multiple time to have same training has rest
             if over_train_walk:
                 cpt = 0
-                if len(l_obs_koho[1]) > 0:
-                    while cpt < len(l_obs_koho[0]):
+                if <int>len(l_obs_koho[1]) > 0:
+                    while cpt < <int>len(l_obs_koho[0]):
                         koho_cp[1].algo_kohonen(l_obs_koho[1])
-                        cpt += len(l_obs_koho[1])
+                        cpt += <int>len(l_obs_koho[1])
             #compute success of the networks
             success_cp, lor_trash = self.test(l_obs, l_res, on_modulate_chan=False)
             #if we keep the same network for too long we go there
-            if math.exp(-abs(success-success_cp)/(alpha*1.0)) in [0.0, 1.0]:
+            if <double>math.exp(-abs(success-success_cp)/(alpha*1.0)) in [0.0, 1.0]:
                 print('break')
                 break
             #simulated annealing criterion to keep or not the trained network
-            if success < success_cp or rnd.random() < math.exp(-abs(success-success_cp)/(alpha*1.0)):
+            if success < success_cp or <double>rnd.random() < <double>math.exp(-abs(success-success_cp)/(alpha*1.0)):
                 success = copy.copy(success_cp)
                 self.koho = copy.copy(koho_cp)
 
@@ -392,11 +407,14 @@ class brain_state_calculate:
             #alpha *= Lambda
             n += 1
 
-    def train_nets(self, l_obs, l_res, cft, with_RL=True, obs_to_add=0, train_mod_chan=True):
+    cpdef int train_nets(self, object l_obs, object l_res, object cft, object with_RL=True, int obs_to_add=0, object train_mod_chan=True):
+        cdef double success
+        cdef np.ndarray[np.int_t, ndim=1] walk_get, walk_expected
+        cdef int win1, win2, i, k, obs_ind
         if not train_mod_chan:
             self.mod_chan = range(self.chan_count)
 
-        if len(l_obs) <= 0:
+        if <int>len(l_obs) <= 0:
             print "l_obs empty"
             return -1
 
@@ -411,7 +429,7 @@ class brain_state_calculate:
         # success, l_of_res = self.test(l_obs, l_res, test_mod=False)
         #we look the walk in the raw result
         walk_get = np.nonzero(l_of_res[self.name+'_raw'])[0]
-        if walk_get.shape[0] == 0:
+        if <int>walk_get.shape[0] == 0:
             self.was_bad += 1
             if self.was_bad > 1:
                 l_obs_koho = cft.obs_classify_kohonen(l_obs)
@@ -422,7 +440,6 @@ class brain_state_calculate:
 
         if with_RL:
             success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
-
             win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
             if win1 > win2:
                 #update l_of_res in case the for loop are not in the else
@@ -439,19 +456,18 @@ class brain_state_calculate:
                 walk_expected = np.nonzero(l_of_res['gnd_truth'])[0]
                 for i in range(14):
                     #when algo say walk we try to exclude the obs from walk network and include it in rest network
-                    if walk_get.shape[0] > 0:
+                    if <int>walk_get.shape[0] > 0:
                         for k in range(3):
                             obs_ind = walk_get[rnd.randrange(walk_get.shape[0])]
-                            self.koho[0].update_closest_neurons(l_obs[obs_ind])
-                            self.koho[1].update_closest_neurons(l_obs[obs_ind], push_away=True)
+                            self.koho[0].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind])
+                            self.koho[1].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind], push_away=True)
 
-                    if walk_expected.shape[0] > 0:
+                    if <int>walk_expected.shape[0] > 0:
                         #when we want walk we try to include the obs in walk and exclude it from rest
                         for k in range(3):
                             obs_ind = walk_expected[rnd.randrange(walk_expected.shape[0])]
                             self.koho[0].update_closest_neurons(l_obs[obs_ind], push_away=True)
                             self.koho[1].update_closest_neurons(l_obs[obs_ind])
-
                     success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
                     win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
                     #if result are better we keep the network
@@ -500,7 +516,7 @@ class brain_state_calculate:
             self.save_obj(filename+str(time.time())+'.pyObj')
 
     def train_nets_new_day(self, l_obs, l_res, cft):
-        if len(l_obs) <= 0:
+        if <int>len(l_obs) <= 0:
             print "l_obs empty"
             return -1
         success, l_of_res = self.test(l_obs, l_res)
@@ -539,7 +555,7 @@ class brain_state_calculate:
 
         l_res, l_obs = cft.read_cpp_files(paths, use_classifier_result=is_healthy, cut_after_cue=False,
                                           init_in_walk=True, on_stim=on_stim)
-        if len(l_obs) <= 0:
+        if <int>len(l_obs) <= 0:
             print "l_obs empty"
             return -2
 
@@ -565,7 +581,7 @@ class brain_state_calculate:
 
         for path in paths:
             l_res, l_obs = cft.read_cpp_files([path], use_classifier_result=False, cut_after_cue=False, init_in_walk=True)
-            if len(l_obs) > 0:
+            if <int>len(l_obs) > 0:
                 success, l_of_res = self.test(l_obs, l_res, on_modulate_chan=on_modulate_chan)
                 if include_classifier_result:
                     l_res, l_obs = cft.read_cpp_files([path], use_classifier_result=True, cut_after_cue=False, init_in_walk=True)

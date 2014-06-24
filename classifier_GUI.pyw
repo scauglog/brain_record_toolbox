@@ -1,5 +1,5 @@
-import brain_state_calculate as bsc
-import cpp_file_tools as cft
+import brain_state_calculate_c as bsc
+import cpp_file_tools_c as cft
 import ast
 import numpy as np
 import datetime

@@ -206,7 +206,7 @@ cdef class brain_state_calculate:
         #test one obs
         dist_res = np.arange(0, <int>len(self.koho), 1.0)
         best_ns = []
-        res = copy.copy(self.default_res)
+        res = copy.deepcopy(self.default_res)
 
         #find the best distance of the obs to each network
         for k in range(<int>len(self.koho)):
@@ -233,7 +233,7 @@ cdef class brain_state_calculate:
             res[rank] = 1
 
             #save P.T
-            self.prevP = copy.copy(P.T)
+            self.prevP = copy.deepcopy(P.T)
         else:
             print "no HMM"
             #transform in readable result
@@ -276,7 +276,7 @@ cdef class brain_state_calculate:
 
     def get_only_mod_chan(self, obs):
         cdef int c
-        obs_mod = copy.copy(np.array(map(float, obs)))
+        obs_mod = copy.deepcopy(np.array(map(float, obs)))
         #keep only chan that where modulated
         for c in range(<int>obs_mod.shape[0]):
             if c not in self.mod_chan:
@@ -372,7 +372,7 @@ cdef class brain_state_calculate:
         n = 0
         while success <= max_success and n < max_iteration:
             print(success)
-            koho_cp = copy.copy(self.koho)
+            koho_cp = copy.deepcopy(self.koho)
             #train each kohonen network
             for i in range(<int>len(koho_cp)):
                 #update learning coefficient
@@ -397,8 +397,8 @@ cdef class brain_state_calculate:
                 break
             #simulated annealing criterion to keep or not the trained network
             if success < success_cp or <double>rnd.random() < <double>math.exp(-abs(success-success_cp)/(alpha*1.0)):
-                success = copy.copy(success_cp)
-                self.koho = copy.copy(koho_cp)
+                success = copy.deepcopy(success_cp)
+                self.koho = copy.deepcopy(koho_cp)
 
             #learning rate decrease over iteration
             #change learning rate
@@ -420,7 +420,7 @@ cdef class brain_state_calculate:
 
         #we use l_obs_mod only to classify result
         if with_RL:
-            save_koho = copy.copy(self.koho)
+            save_koho = copy.deepcopy(self.koho)
         success, l_of_res = self.test(l_obs, l_res, on_modulate_chan=False)
         success, l_of_res_classify = self.test(l_obs, l_res, on_modulate_chan=True)
         l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res_classify[self.name+'_raw'], obs_to_add)
@@ -443,8 +443,8 @@ cdef class brain_state_calculate:
             win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
             if win1 > win2:
                 #update l_of_res in case the for loop are not in the else
-                l_of_res = copy.copy(l_of_res_new)
-                save_koho = copy.copy(self.koho)
+                l_of_res = copy.deepcopy(l_of_res_new)
+                save_koho = copy.deepcopy(self.koho)
                 print("better with training --------")
             else:
                 self.koho = save_koho
@@ -460,20 +460,20 @@ cdef class brain_state_calculate:
                         for k in range(3):
                             obs_ind = walk_get[rnd.randrange(walk_get.shape[0])]
                             self.koho[0].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind])
-                            self.koho[1].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind], push_away=True)
+                            #self.koho[1].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind], push_away=True)
 
                     if <int>walk_expected.shape[0] > 0:
                         #when we want walk we try to include the obs in walk and exclude it from rest
                         for k in range(3):
                             obs_ind = walk_expected[rnd.randrange(walk_expected.shape[0])]
-                            self.koho[0].update_closest_neurons(l_obs[obs_ind], push_away=True)
-                            self.koho[1].update_closest_neurons(l_obs[obs_ind])
+                            #self.koho[0].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind], push_away=True)
+                            self.koho[1].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind])
                     success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
                     win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
                     #if result are better we keep the network
                     if win1 > win2:
-                        l_of_res = copy.copy(l_of_res_new)
-                        save_koho = copy.copy(self.koho)
+                        l_of_res = copy.deepcopy(l_of_res_new)
+                        save_koho = copy.deepcopy(self.koho)
                         print("better ---")
                     else:
                         self.koho = save_koho

@@ -379,27 +379,27 @@ class cpp_file_tools:
         short_w1 = w_after_cue1[w_after_cue1 < short_walk]
         short_w2 = w_after_cue2[w_after_cue2 < short_walk]
 
-        #good training have one long walk
-        #who has less long walk but at least one
-        if 0 < long_w1.shape[0] < long_w2.shape[0]:
-            win_point1 += 1
-        elif 0 < long_w2.shape[0] < long_w1.shape[0]:
-            win_point2 += 1
-        elif long_w1.shape[0] < 1 and long_w1.shape[0] < 1:
-            win_point1 -= 1
-            win_point2 -= 1
-        else:
-            win_point1 += 1
-            win_point2 += 2
-
-        #who has less short walk
-        if short_w1.shape[0] < short_w2.shape[0]:
-            win_point1 += 1
-        elif short_w2.shape[0] < short_w1.shape[0]:
-            win_point2 += 1
-        else:
-            win_point1 += 1
-            win_point2 += 1
+        # #good training have one long walk
+        # #who has less long walk but at least one
+        # if 0 < long_w1.shape[0] < long_w2.shape[0]:
+        #     win_point1 += 1
+        # elif 0 < long_w2.shape[0] < long_w1.shape[0]:
+        #     win_point2 += 1
+        # elif long_w1.shape[0] < 1 and long_w1.shape[0] < 1:
+        #     win_point1 -= 1
+        #     win_point2 -= 1
+        # else:
+        #     win_point1 += 1
+        #     win_point2 += 2
+        #
+        # #who has less short walk
+        # if short_w1.shape[0] < short_w2.shape[0]:
+        #     win_point1 += 1
+        # elif short_w2.shape[0] < short_w1.shape[0]:
+        #     win_point2 += 1
+        # else:
+        #     win_point1 += 1
+        #     win_point2 += 1
 
         #before cue fav short walk
         #init mean cause array.mean() return none if array is empty
@@ -441,24 +441,24 @@ class cpp_file_tools:
             win_point1 += 1
             win_point2 += 1
 
-        #who has the longest walk
-        #init max cause array.max() return none if array is empty
-        if all_w1.shape[0] > 0:
-            all_w1_max = all_w1.max()
-        else:
-            all_w1_max = 0
-        if all_w2.shape[0] > 0:
-            all_w2_max = all_w2.max()
-        else:
-            all_w2_max = 0
-
-        if all_w1_max > all_w2_max:
-            win_point1 += 1
-        elif all_w2_max > all_w1_max:
-            win_point2 += 1
-        else:
-            win_point1 += 1
-            win_point2 += 1
+        # #who has the longest walk
+        # #init max cause array.max() return none if array is empty
+        # if all_w1.shape[0] > 0:
+        #     all_w1_max = all_w1.max()
+        # else:
+        #     all_w1_max = 0
+        # if all_w2.shape[0] > 0:
+        #     all_w2_max = all_w2.max()
+        # else:
+        #     all_w2_max = 0
+        #
+        # if all_w1_max > all_w2_max:
+        #     win_point1 += 1
+        # elif all_w2_max > all_w1_max:
+        #     win_point2 += 1
+        # else:
+        #     win_point1 += 1
+        #     win_point2 += 1
 
         #less walk time before cue
         if w_before_cue1.sum() < w_before_cue2.sum():
@@ -475,11 +475,11 @@ class cpp_file_tools:
         if w_before_cue2.shape[0] == 0:
             win_point2 += 1
 
-        #at least min_walk of walk
-        if all_w1.sum() > min_walk:
-            win_point1 += 1
-        if all_w2.sum() > min_walk:
-            win_point2 += 1
+        # #at least min_walk of walk
+        # if all_w1.sum() > min_walk:
+        #     win_point1 += 1
+        # if all_w2.sum() > min_walk:
+        #     win_point2 += 1
 
         if no_perfect:
             return win_point1, win_point2

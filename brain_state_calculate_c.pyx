@@ -441,7 +441,7 @@ cdef class brain_state_calculate:
         if with_RL:
             success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
             win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
-            if win1 > win2:
+            if win1 <= win2:
                 #update l_of_res in case the for loop are not in the else
                 l_of_res = copy.deepcopy(l_of_res_new)
                 save_koho = copy.deepcopy(self.koho)
@@ -460,18 +460,18 @@ cdef class brain_state_calculate:
                         for k in range(3):
                             obs_ind = walk_get[rnd.randrange(walk_get.shape[0])]
                             self.koho[0].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind])
-                            #self.koho[1].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind], push_away=True)
+                            self.koho[1].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind], push_away=True)
 
                     if <int>walk_expected.shape[0] > 0:
                         #when we want walk we try to include the obs in walk and exclude it from rest
                         for k in range(3):
                             obs_ind = walk_expected[rnd.randrange(walk_expected.shape[0])]
-                            #self.koho[0].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind], push_away=True)
+                            self.koho[0].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind], push_away=True)
                             self.koho[1].update_closest_neurons(<np.ndarray[DTYPE_t, ndim=1]>l_obs[obs_ind])
                     success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
                     win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
                     #if result are better we keep the network
-                    if win1 >= win2:
+                    if win1 < win2:
                         l_of_res = copy.deepcopy(l_of_res_new)
                         save_koho = copy.deepcopy(self.koho)
                         print("better ---")

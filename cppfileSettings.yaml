@@ -28,3 +28,5 @@ walk_SCI: ['2']
 
 cue_col: 5
 result_col: 3
+
+block_length: 0.05

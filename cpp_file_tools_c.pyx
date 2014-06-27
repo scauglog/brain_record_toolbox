@@ -50,6 +50,8 @@ cdef class cpp_file_tools:
         self.cue_col = cftset['cue_col']
         self.result_col = cftset['result_col']
 
+        self.block_length = cftset['block_length']
+
     def convert_one_cpp_file(self, filename, use_classifier_result=False, cut_after_cue=False, init_in_walk=True, on_stim=False):
         cdef np.ndarray[DTYPE_t, ndim=1] brain_state
         #if is healthy the gnd truth is on col 4 else it's on col 6
@@ -376,14 +378,13 @@ cdef class cpp_file_tools:
 
     #classify the given result
     def compare_result(self, l_res1, l_res2, l_expected_res, no_perfect=False):
-        cdef double block_length, min_walk, long_walk, short_walk, success_rate1, success_rate2
+        cdef double min_walk, long_walk, short_walk, success_rate1, success_rate2
         cdef int win_point1, win_point2, all_w1_max, all_w2_max
         w_before_cue1, w_after_cue1 = self.class_result(l_res1, l_expected_res)
         w_before_cue2, w_after_cue2 = self.class_result(l_res2, l_expected_res)
-        block_length = 0.1
-        min_walk = 3/block_length
-        long_walk = 1/block_length
-        short_walk = 0.2/block_length
+        min_walk = 3/self.block_length
+        long_walk = 1/self.block_length
+        short_walk = 0.2/self.block_length
         win_point1 = 0
         win_point2 = 0
         success_rate1 = 0
@@ -391,10 +392,10 @@ cdef class cpp_file_tools:
         all_w1 =  np.hstack((w_before_cue1, w_after_cue1))
         all_w2 =  np.hstack((w_before_cue2, w_after_cue2))
 
-        long_w1 =  w_after_cue1[w_after_cue1 > long_walk]
-        long_w2 =  w_after_cue2[w_after_cue2 > long_walk]
-        short_w1 =  w_after_cue1[w_after_cue1 < short_walk]
-        short_w2 =  w_after_cue2[w_after_cue2 < short_walk]
+        #long_w1 =  w_after_cue1[w_after_cue1 > long_walk]
+        #long_w2 =  w_after_cue2[w_after_cue2 > long_walk]
+        #short_w1 =  w_after_cue1[w_after_cue1 < short_walk]
+        #short_w2 =  w_after_cue2[w_after_cue2 < short_walk]
 
         ##good training have one long walk
         ##who has less long walk but at least one
@@ -512,9 +513,8 @@ cdef class cpp_file_tools:
 
     cpdef double success_rate(self, object l_res, object l_expected_res):
         #if there is no walk when we want rest and at least X second of walk
-        cdef double block_length, min_walk
-        block_length = 0.1
-        min_walk = 3/block_length
+        cdef double min_walk
+        min_walk = 3/self.block_length
         w_before_cue, w_after_cue = self.class_result(l_res, l_expected_res)
         if <int>w_before_cue.shape[0] == 0:
             return min(1.0, w_after_cue.sum()/float(min_walk))

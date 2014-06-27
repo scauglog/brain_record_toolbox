@@ -467,7 +467,7 @@ class brain_state_calculate:
                     success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
                     win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
                     #if result are better we keep the network
-                    if win1 > win2:
+                    if win1 >= win2:
                         l_of_res = copy.deepcopy(l_of_res_new)
                         save_koho = copy.deepcopy(self.koho)
                         print("better ---")

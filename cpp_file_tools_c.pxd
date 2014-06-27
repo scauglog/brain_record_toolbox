@@ -13,7 +13,7 @@ cdef class cpp_file_tools:
 
     cdef public object stop, walk, stop_healthy, init_healthy, walk_healthy, stop_SCI, init_SCI, walk_SCI
     cdef public int stop_index, walk_index, first_chan, kc_col, kc_row, cue_col, result_col
-    cdef public double kc_max_weight, kc_alpha, kc_neighbor, kc_min_win
+    cdef public double kc_max_weight, kc_alpha, kc_neighbor, kc_min_win, block_length
 
     cpdef np.ndarray convert_brain_state(self, object obs)
 

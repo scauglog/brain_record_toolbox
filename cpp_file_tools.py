@@ -296,10 +296,7 @@ class cpp_file_tools:
                 nb_stop = len(dict_res[stop])
                 nb_walk = len(dict_res[walk])
                 print('nb stop', nb_stop, 'nb_walk', nb_walk, nb_walk/float(nb_stop))
-                if acceptance_factor > 0 and (acceptance_factor < nb_walk/float(nb_stop) < 1.5) or (nb_walk + nb_stop < 150 and nb_walk > 20):
-                    return l_obs_koho
-                elif acceptance_factor == 0:
-                    return l_obs_koho
+                return l_obs_koho
             else:
                 return [[], []]
 
@@ -341,9 +338,9 @@ class cpp_file_tools:
         walk_before_cue = []
         walk_after_cue = []
         current_walk = 0
-        for i in range(len(l_res)):
+        for i in range(1, len(l_res)):
             #when we are at the end of the walk or cue change and we walk
-            if i > 0 and (l_res[i] != l_res[i-1] or l_expected_res[i] != l_expected_res[i-1]) and l_res[i] == 0:
+            if l_res[i] != l_res[i-1] or l_expected_res[i] != l_expected_res[i-1] or i+1==len(l_res):
                 if current_walk != 0:
                     if l_expected_res[i-1] == 0:
                         walk_before_cue.append(current_walk)
@@ -354,7 +351,7 @@ class cpp_file_tools:
             if l_res[i] == 1:
                current_walk += 1
 
-        return walk_before_cue, walk_after_cue
+        return np.array(walk_before_cue), np.array(walk_after_cue)
 
     #classify the given result
     def compare_result(self, l_res1, l_res2, l_expected_res, no_perfect=False):
@@ -367,40 +364,35 @@ class cpp_file_tools:
         win_point2 = 0
         success_rate1 = 0
         success_rate2 = 0
+        all_w1 = np.hstack((w_before_cue1, w_after_cue1))
+        all_w2 = np.hstack((w_before_cue2, w_after_cue2))
 
-        all_w1 = np.array(w_before_cue1 + w_after_cue1)
-        all_w2 = np.array(w_before_cue2 + w_after_cue2)
-
-        w_before_cue1 = np.array(w_before_cue1)
-        w_before_cue2 = np.array(w_before_cue2)
-        w_after_cue1 = np.array(w_after_cue1)
-        w_after_cue2 = np.array(w_after_cue2)
-        # long_w1 = w_after_cue1[w_after_cue1 > long_walk]
-        # long_w2 = w_after_cue2[w_after_cue2 > long_walk]
-        # short_w1 = w_after_cue1[w_after_cue1 < short_walk]
-        # short_w2 = w_after_cue2[w_after_cue2 < short_walk]
+        long_w1 = w_after_cue1[w_after_cue1 > long_walk]
+        long_w2 = w_after_cue2[w_after_cue2 > long_walk]
+        short_w1 = w_after_cue1[w_after_cue1 < short_walk]
+        short_w2 = w_after_cue2[w_after_cue2 < short_walk]
 
         # #good training have one long walk
         # #who has less long walk but at least one
-        # if 0 < long_w1.shape[0] < long_w2.shape[0]:
-        #     win_point1 += 1
-        # elif 0 < long_w2.shape[0] < long_w1.shape[0]:
-        #     win_point2 += 1
-        # elif long_w1.shape[0] < 1 and long_w1.shape[0] < 1:
-        #     win_point1 -= 1
-        #     win_point2 -= 1
-        # else:
-        #     win_point1 += 1
-        #     win_point2 += 2
+        if 0 < long_w1.shape[0] < long_w2.shape[0]:
+            win_point1 += 1
+        elif 0 < long_w2.shape[0] < long_w1.shape[0]:
+            win_point2 += 1
+        elif long_w1.shape[0] < 1 and long_w1.shape[0] < 1:
+            win_point1 -= 1
+            win_point2 -= 1
+        else:
+            win_point1 += 1
+            win_point2 += 2
         #
         # #who has less short walk
-        # if short_w1.shape[0] < short_w2.shape[0]:
-        #     win_point1 += 1
-        # elif short_w2.shape[0] < short_w1.shape[0]:
-        #     win_point2 += 1
-        # else:
-        #     win_point1 += 1
-        #     win_point2 += 1
+        if short_w1.shape[0] < short_w2.shape[0]:
+            win_point1 += 1
+        elif short_w2.shape[0] < short_w1.shape[0]:
+            win_point2 += 1
+        else:
+            win_point1 += 1
+            win_point2 += 1
 
         #before cue fav short walk
         #init mean cause array.mean() return none if array is empty
@@ -424,42 +416,42 @@ class cpp_file_tools:
 
         #during cue fav long walk
         #init mean cause array.mean() return none if array is empty
-        # if w_after_cue1.shape[0] > 0:
-        #     wdc1_mean = w_after_cue1.mean()
-        # else:
-        #     wdc1_mean = 0
-        #
-        # if w_after_cue2.shape[0] > 0:
-        #     wdc2_mean = w_after_cue2.mean()
-        # else:
-        #     wdc2_mean = 0
-        #
-        # if wdc1_mean > wdc2_mean:
-        #     win_point1 += 1
-        # elif wdc2_mean > wdc1_mean:
-        #     win_point2 += 1
-        # else:
-        #     win_point1 += 1
-        #     win_point2 += 1
+        if w_after_cue1.shape[0] > 0:
+            wdc1_mean = w_after_cue1.mean()
+        else:
+            wdc1_mean = 0
+
+        if w_after_cue2.shape[0] > 0:
+            wdc2_mean = w_after_cue2.mean()
+        else:
+            wdc2_mean = 0
+
+        if wdc1_mean > wdc2_mean:
+            win_point1 += 1
+        elif wdc2_mean > wdc1_mean:
+            win_point2 += 1
+        else:
+            win_point1 += 1
+            win_point2 += 1
 
         # #who has the longest walk
         # #init max cause array.max() return none if array is empty
-        # if all_w1.shape[0] > 0:
-        #     all_w1_max = all_w1.max()
-        # else:
-        #     all_w1_max = 0
-        # if all_w2.shape[0] > 0:
-        #     all_w2_max = all_w2.max()
-        # else:
-        #     all_w2_max = 0
-        #
-        # if all_w1_max > all_w2_max:
-        #     win_point1 += 1
-        # elif all_w2_max > all_w1_max:
-        #     win_point2 += 1
-        # else:
-        #     win_point1 += 1
-        #     win_point2 += 1
+        if all_w1.shape[0] > 0:
+            all_w1_max = all_w1.max()
+        else:
+            all_w1_max = 0
+        if all_w2.shape[0] > 0:
+            all_w2_max = all_w2.max()
+        else:
+            all_w2_max = 0
+
+        if all_w1_max > all_w2_max:
+            win_point1 += 1
+        elif all_w2_max > all_w1_max:
+            win_point2 += 1
+        else:
+            win_point1 += 1
+            win_point2 += 1
 
         #less walk time before cue
         if w_before_cue1.sum() < w_before_cue2.sum():
@@ -520,9 +512,9 @@ class cpp_file_tools:
         if walk_total > 0 and rest_total > 0:
             return (walk_success/walk_total+rest_success/rest_total)/2
         elif walk_total > 0 and rest_total < 0:
-            return walk_success/walk_total
+            return (walk_success/walk_total)/2
         elif rest_total > 0 and walk_total < 0:
-            return rest_success/rest_total
+            return (rest_success/rest_total)/2
         else:
             return 0
 

@@ -205,9 +205,15 @@ class brain_state_calculate:
 
         #find the best distance of the obs to each network
         for k in range(len(self.koho)):
-            dist_res[k] = self.koho[k].find_mean_best_dist(obs, self.dist_count)
+            #dist_res[k] = self.koho[k].find_mean_best_dist(obs, self.dist_count)
             #we add extra neurons to best_ns in order to remove null probability
-            best_ns += self.koho[k].find_best_X_neurons(obs, self.dist_count+self.dist_count)
+            tmp_ns = self.koho[k].find_best_X_neurons(obs, self.dist_count)
+            best_ns += tmp_ns
+            mean = 0
+            for neur in tmp_ns:
+                mean += neur.calc_error(obs)
+            dist_res[k] = mean/float(self.dist_count)
+
         self.raw_res = dist_res.argmin()
         if self.HMM:
             #flatten list
@@ -355,20 +361,7 @@ class brain_state_calculate:
         success -= 0.1
         alpha = alpha_start
         n = 0
-
-        walk_nb = len(l_obs_koho[0])
-        rest_nb = len(l_obs_koho[1])
-        if walk_nb > rest_nb:
-            tmp = []
-            for i in range(walk_nb/rest_nb+1):
-                tmp += l_obs_koho[0]
-        elif walk_nb < rest_nb:
-            tmp = []
-            for i in range(rest_nb/walk_nb+1):
-                tmp += l_obs_koho[1]
-
         while success <= max_success and n < max_iteration:
-            print(success)
             koho_cp = copy.deepcopy(self.koho)
             #train each kohonen network
             for i in range(len(koho_cp)):
@@ -436,13 +429,13 @@ class brain_state_calculate:
             success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
 
             win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
-            if win1 <= win2:
+            if win2 >= win1:
                 #update l_of_res in case the for loop are not in the else
                 l_of_res = copy.deepcopy(l_of_res_new)
                 save_koho = copy.deepcopy(self.koho)
                 print("better with training --------")
             else:
-                self.koho = save_koho
+                self.koho = copy.deepcopy(save_koho)
                 print("worst with training")
 
                 self.koho[1].alpha = 0.1
@@ -467,7 +460,7 @@ class brain_state_calculate:
                     success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
                     win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
                     #if result are better we keep the network
-                    if win1 < win2:
+                    if win2 > win1:
                         l_of_res = copy.deepcopy(l_of_res_new)
                         save_koho = copy.deepcopy(self.koho)
                         print("better ---")

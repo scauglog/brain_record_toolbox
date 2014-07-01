@@ -427,50 +427,6 @@ cdef class brain_state_calculate:
         #we use l_obs_mod only to classify result
         if with_RL:
             save_koho = copy.deepcopy(self.koho)
-            success, l_of_res = self.test(l_obs, l_res, on_modulate_chan=False)
-            # #RL
-            # success, l_of_res_classify = self.test(l_obs, l_res, on_modulate_chan=True)
-            # l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res_classify[self.name], 2)
-            # self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
-            # success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
-            #
-            # win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
-            # if win2 >= win1:
-            #     #update l_of_res in case the for loop are not in the else
-            #     l_of_res = copy.deepcopy(l_of_res_new)
-            #     save_koho = copy.deepcopy(self.koho)
-            #     print("better with training --------")
-            # else:
-            #     self.koho = copy.deepcopy(save_koho)
-            #     print("worst with training")
-            #
-            #     success, l_of_res_classify = self.test(l_obs, l_res, on_modulate_chan=True)
-            #     l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res_classify[self.name], 0)
-            #     self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
-            #
-            #     win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
-            #     if win2 >= win1:
-            #         #update l_of_res in case the for loop are not in the else
-            #         l_of_res = copy.deepcopy(l_of_res_new)
-            #         save_koho = copy.deepcopy(self.koho)
-            #         print("better with training --------")
-            #     else:
-            #         self.koho = copy.deepcopy(save_koho)
-            #         print("worst with training")
-            #
-            #         success, l_of_res_classify = self.test(l_obs, l_res, on_modulate_chan=True)
-            #         l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res_classify[self.name], -2)
-            #         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
-            #
-            #         win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
-            #         if win2 >= win1:
-            #             #update l_of_res in case the for loop are not in the else
-            #             l_of_res = copy.deepcopy(l_of_res_new)
-            #             save_koho = copy.deepcopy(self.koho)
-            #             print("better with training --------")
-            #         else:
-            #             self.koho = copy.deepcopy(save_koho)
-            #             print("worst with training")
 
         success, l_of_res = self.test(l_obs, l_res, on_modulate_chan=False)
         success, l_of_res_classify = self.test(l_obs, l_res, on_modulate_chan=True)

@@ -24,7 +24,7 @@ l_res, l_obs = my_bsc.cft.convert_cpp_file(dir_name, 't_0423', files0423[0:5], F
 #use training dataset (not working)
 # sp = signal_processing.Signal_processing()
 # l_obs = sp.load_m(dir_name+'trainSet140423.mat', 'BrainAct')
-l_obs_koho = my_bsc.cft.obs_classify_kohonen(l_obs, 0.0)
+l_obs_koho = my_bsc.cft.obs_classify_kohonen(l_obs)
 
 #build and train networks
 my_bsc.build_networks()

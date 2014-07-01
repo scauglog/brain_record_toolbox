@@ -262,7 +262,7 @@ cdef class cpp_file_tools:
             l_obs_walk = tmp_l
         return [l_obs_stop, l_obs_walk]
 
-    def obs_classify_kohonen(self, l_obs, double acceptance_factor=0.0):
+    def obs_classify_kohonen(self, l_obs):
         print('###### classify with kohonen ######')
         cdef int n, i, stop, walk, nb_stop, nb_walk
         cdef kn.Kohonen net
@@ -314,10 +314,7 @@ cdef class cpp_file_tools:
                 nb_stop = <int>len(dict_res[stop])
                 nb_walk = <int>len(dict_res[walk])
                 print('nb stop', nb_stop, 'nb_walk', nb_walk, nb_walk/float(nb_stop))
-                if acceptance_factor > 0.0 and (acceptance_factor < nb_walk/float(nb_stop) < 1.5) or (nb_walk + nb_stop < 150 and nb_walk > 20):
-                    return l_obs_koho
-                elif acceptance_factor == 0.0:
-                    return l_obs_koho
+                return l_obs_koho
             else:
                 return [[], []]
 

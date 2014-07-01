@@ -1,11 +1,11 @@
-import brain_state_calculate as bsc
+import brain_state_calculate_c as bsc
 import numpy as np
 import copy
 import random as rnd
 import pickle
 import matplotlib.pyplot as plt
 from collections import OrderedDict
-from cpp_file_tools import cpp_file_tools
+from cpp_file_tools_c import cpp_file_tools
 
 class ChangeObs:
     def __init__(self, l_obs):
@@ -18,7 +18,7 @@ class ChangeObs:
         self.value_modulate = []
         #param for mean modulation
         mu = 0
-        sigma = 2
+        sigma = 1
 
         l_obs = np.array(l_obs)
         #index of modulated channel
@@ -99,7 +99,7 @@ class Analyse_Result:
         self.img_save_path = 'benchmark_img/'
         self.ground_truth = ['gnd_truth']
 
-        self.my_cft = cpp_file_tools(nb_chan, group_by, self.ext_img, self.save_img, self.show)
+        self.my_cft = cpp_file_tools(nb_chan, group_by, self.ext_img, self.save_img, self.show,ion=False)
 
     @staticmethod
     def import_file(filename):
@@ -277,23 +277,25 @@ class Benchmark(object):
         self.show = False
         self.img_save_path = 'benchmark_img/'
 
-        self.my_cft = cpp_file_tools(nb_chan, group_by, self.ext_img, self.save_img, self.show)
+        self.my_cft = cpp_file_tools(nb_chan, group_by, self.ext_img, self.save_img, self.show, ion=False)
         self.res_dict={}
 
         #simulated benchmark option
-        self.simulated_dir_name = '../RT_classifier/BMIOutputs/0423_r600/'
-        simulated_iteration = 5
-        self.simulated_files = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+        self.simulated_dir_name = '../data/RT_classifier/BMIOutputs/0423_r600/'
+        simulated_iteration = 3
+        self.simulated_files = [2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14]
         self.simulated_date = 't_0423'
         self.simulated_rat = 'r0'
         self.simulated_corename = 'healthyOutput_'
         self.simulated_change_every = len(self.simulated_files)
-        self.simulated_first_train = 5
+        self.simulated_first_train = 3
+        tmp=[]
         for i in range(simulated_iteration):
-            self.simulated_files += self.simulated_files
+            tmp += self.simulated_files
+        self.simulated_files = tmp
 
         #SCI benchmark option
-        self.SCI_dir_name = '../RT_classifier/BMIOutputs/BMISCIOutputs/'
+        self.SCI_dir_name = '../data/RT_classifier/BMIOutputs/BMISCIOutputs/'
         self.SCI_corename = 'SCIOutput_'
         self.SCI_first_train = 5
         self.SCI_min_obs = 10
@@ -375,7 +377,7 @@ class Benchmark(object):
         #save the res
         chg_obs = []
         rnd.seed(42)
-        rat=self.simulated_rat
+        rat = self.simulated_rat
         self.res_dict = {rat: {str(len(chg_obs)): {'l_of_res': []}}}
         date = 0
         self.init_classifier()
@@ -422,9 +424,9 @@ class Benchmark(object):
 
             try:
                 if i % self.simulated_change_every == 0:
-                        self.train_with_obs(l_obs, l_res, True)
+                    self.train_with_obs(l_obs, l_res, True)
                 else:
-                        self.train_with_obs(l_obs, l_res, False)
+                    self.train_with_obs(l_obs, l_res, False)
             except ValueError:
                 print 'goto the next trial'
 
@@ -444,7 +446,7 @@ class Benchmark(object):
         rnd.shuffle(l_obs)
 
     def change_chan_group_by(self, nb_chan, group_by):
-        self.my_cft = cpp_file_tools(nb_chan, group_by, self.ext_img, self.save_img, self.show)
+        self.my_cft = cpp_file_tools(nb_chan, group_by, self.ext_img, self.save_img, self.show, ion=False)
 
     def init_classifier(self):
         raise NotImplementedException("Subclasses are responsible for creating this method")
@@ -492,4 +494,4 @@ class Benchmark_Koho(Benchmark):
     def train_with_obs(self, l_obs, l_res, new_day):
         if new_day:
             self.classifier.train_nets_new_day(l_obs, l_res, self.my_cft)
-        self.classifier.train_nets(l_obs, l_res, self.my_cft, with_RL=True, obs_to_add=-1, train_mod_chan=True)
+        self.classifier.train_nets(l_obs, l_res, self.my_cft, with_RL=True, obs_to_add=0, train_mod_chan=True)

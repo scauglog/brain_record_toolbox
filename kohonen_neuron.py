@@ -14,6 +14,7 @@ class Neurone:
         self.row = row
         #number of time a neuron win, used for weighted mean when group neurons
         self.win_count = 0
+        self.group = -1
         for i in range(self.weight_count):
             self.weights[i] = rnd.uniform(-max_rnd, max_rnd)
 
@@ -443,15 +444,18 @@ class Group_neuron:
         self.template = np.array(neuron.weights)
         self.color = plot_color[gpe_count % len(plot_color)]
         self.number = gpe_count
+        neuron.group = self.number
         self.spikes = []
 
     def add_neuron(self, neuron):
         self.neurons.append(neuron)
+        neuron.group = self.number
         self.compute_template()
 
     def merge_group(self, group):
         for n in group.neurons:
             self.neurons.append(n)
+            n.group = self.number
         self.compute_template()
 
     def compute_template(self):

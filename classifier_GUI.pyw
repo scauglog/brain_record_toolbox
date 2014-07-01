@@ -69,7 +69,7 @@ class Classifier_GUI(Tk):
         self.quit()
 
     def load_classifier(self):
-        self.my_bsc = bsc.brain_state_calculate(32, settings_path="classifierSettings2.yaml")
+        self.my_bsc = bsc.brain_state_calculate(32, settings_path="classifierSettings.yaml")
         res = self.my_bsc.load_networks_file(self.init_dir)
         if res >= 0:
             self.enable_all_button()
@@ -320,7 +320,7 @@ class Classifier_GUI(Tk):
         self.e_HMM_param = Entry(self.f_parameter, width=30)
         self.e_HMM_param.grid(row=4, column=1, sticky=W)
         self.e_HMM_param.delete(0, END)
-        self.e_HMM_param.insert(0,str(np.array([[0.75, 0.25],[0.1,0.9]])))
+        self.e_HMM_param.insert(0,str(np.array([[0.9, 0.1],[0.1,0.9]])))
 
         #mod chan
         self.t_mod_chan = Label(self.f_parameter, text="modulated channel")

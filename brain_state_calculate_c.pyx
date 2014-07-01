@@ -196,6 +196,7 @@ cdef class brain_state_calculate:
     cpdef int test_one_obs(self, object tmp_obs, object on_modulate_chan=True):
         cdef np.ndarray[DTYPE_t, ndim=1] dist_res, P, obs
         cdef int k, i, rank
+        cdef kn.Neurone neur
         #we should tranform
         obs = <np.ndarray[DTYPE_t, ndim=1]> np.array(tmp_obs)
         #we transform the obs according to our need
@@ -210,11 +211,16 @@ cdef class brain_state_calculate:
 
         #find the best distance of the obs to each network
         for k in range(<int>len(self.koho)):
-            dist_res[k] = self.koho[k].find_mean_best_dist(obs, self.dist_count)
+            #dist_res[k] = self.koho[k].find_mean_best_dist(obs, self.dist_count)
             #we add extra neurons to best_ns in order to remove null probability
-            best_ns += self.koho[k].find_best_X_neurons(obs, self.dist_count+self.dist_count)
+            tmp_ns = self.koho[k].find_best_X_neurons(obs, self.dist_count)
+            best_ns += tmp_ns
+            mean = 0
+            for neur in tmp_ns:
+                mean += neur.calc_error(obs)
+            dist_res[k] = mean/float(self.dist_count)
 
-        self.raw_res = <int>dist_res.argmin()
+        self.raw_res = <int> dist_res.argmin()
         if self.HMM:
             #flatten list
             #best_ns = [item for sublist in best_ns for item in sublist]
@@ -361,7 +367,7 @@ cdef class brain_state_calculate:
         indices = sorted(rnd.sample(xrange(n), r))
         return tuple(pool[i] for i in indices)
 
-    def simulated_annealing(self, l_obs, l_obs_koho, l_res, double alpha_start, int max_iteration, int max_success, over_train_walk=False):
+    def simulated_annealing(self, l_obs, l_obs_koho, l_res, double alpha_start, int max_iteration, double max_success, over_train_walk=False):
         #inspired from simulated annealing, to determine when we should stop learning
         #initialize
         cdef double success, success_cp, alpha
@@ -371,7 +377,6 @@ cdef class brain_state_calculate:
         alpha = alpha_start
         n = 0
         while success <= max_success and n < max_iteration:
-            print(success)
             koho_cp = copy.deepcopy(self.koho)
             #train each kohonen network
             for i in range(<int>len(koho_cp)):
@@ -409,8 +414,9 @@ cdef class brain_state_calculate:
 
     cpdef int train_nets(self, object l_obs, object l_res, object cft, object with_RL=True, int obs_to_add=0, object train_mod_chan=True):
         cdef double success
-        cdef np.ndarray[np.int_t, ndim=1] walk_get, walk_expected
-        cdef int win1, win2, i, k, obs_ind
+        #cdef np.ndarray[np.int_t, ndim=1] walk_get, walk_expected
+        cdef int win1, win2
+        #cdef int i, k, obs_ind
         if not train_mod_chan:
             self.mod_chan = range(self.chan_count)
 
@@ -421,14 +427,59 @@ cdef class brain_state_calculate:
         #we use l_obs_mod only to classify result
         if with_RL:
             save_koho = copy.deepcopy(self.koho)
+            success, l_of_res = self.test(l_obs, l_res, on_modulate_chan=False)
+            # #RL
+            # success, l_of_res_classify = self.test(l_obs, l_res, on_modulate_chan=True)
+            # l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res_classify[self.name], 2)
+            # self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
+            # success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
+            #
+            # win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
+            # if win2 >= win1:
+            #     #update l_of_res in case the for loop are not in the else
+            #     l_of_res = copy.deepcopy(l_of_res_new)
+            #     save_koho = copy.deepcopy(self.koho)
+            #     print("better with training --------")
+            # else:
+            #     self.koho = copy.deepcopy(save_koho)
+            #     print("worst with training")
+            #
+            #     success, l_of_res_classify = self.test(l_obs, l_res, on_modulate_chan=True)
+            #     l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res_classify[self.name], 0)
+            #     self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
+            #
+            #     win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
+            #     if win2 >= win1:
+            #         #update l_of_res in case the for loop are not in the else
+            #         l_of_res = copy.deepcopy(l_of_res_new)
+            #         save_koho = copy.deepcopy(self.koho)
+            #         print("better with training --------")
+            #     else:
+            #         self.koho = copy.deepcopy(save_koho)
+            #         print("worst with training")
+            #
+            #         success, l_of_res_classify = self.test(l_obs, l_res, on_modulate_chan=True)
+            #         l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res_classify[self.name], -2)
+            #         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
+            #
+            #         win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
+            #         if win2 >= win1:
+            #             #update l_of_res in case the for loop are not in the else
+            #             l_of_res = copy.deepcopy(l_of_res_new)
+            #             save_koho = copy.deepcopy(self.koho)
+            #             print("better with training --------")
+            #         else:
+            #             self.koho = copy.deepcopy(save_koho)
+            #             print("worst with training")
+
         success, l_of_res = self.test(l_obs, l_res, on_modulate_chan=False)
         success, l_of_res_classify = self.test(l_obs, l_res, on_modulate_chan=True)
-        l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res_classify[self.name+'_raw'], obs_to_add)
+        l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res_classify[self.name], obs_to_add)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
 
         # success, l_of_res = self.test(l_obs, l_res, test_mod=False)
         #we look the walk in the raw result
-        walk_get = np.nonzero(l_of_res[self.name+'_raw'])[0]
+        walk_get = np.nonzero(l_of_res[self.name])[0]
         if <int>walk_get.shape[0] == 0:
             self.was_bad += 1
             if self.was_bad > 1:
@@ -441,18 +492,18 @@ cdef class brain_state_calculate:
         if with_RL:
             success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
             win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
-            if win1 <= win2:
+            if win2 >= win1:
                 #update l_of_res in case the for loop are not in the else
                 l_of_res = copy.deepcopy(l_of_res_new)
                 save_koho = copy.deepcopy(self.koho)
                 print("better with training --------")
             else:
-                self.koho = save_koho
+                self.koho = copy.deepcopy(save_koho)
                 print("worst with training")
 
                 self.koho[1].alpha = 0.1
                 self.koho[0].alpha = 0.1
-                walk_get = np.nonzero(l_of_res[self.name+'_raw'])[0]
+                walk_get = np.nonzero(l_of_res[self.name])[0]
                 walk_expected = np.nonzero(l_of_res['gnd_truth'])[0]
                 for i in range(14):
                     #when algo say walk we try to exclude the obs from walk network and include it in rest network
@@ -471,7 +522,7 @@ cdef class brain_state_calculate:
                     success, l_of_res_new = self.test(l_obs, l_res, on_modulate_chan=False)
                     win1, win2 = cft.compare_result(l_of_res[self.name], l_of_res_new[self.name], l_of_res['gnd_truth'], True)
                     #if result are better we keep the network
-                    if win1 < win2:
+                    if win2 > win1:
                         l_of_res = copy.deepcopy(l_of_res_new)
                         save_koho = copy.deepcopy(self.koho)
                         print("better ---")
@@ -481,7 +532,6 @@ cdef class brain_state_calculate:
 
         if train_mod_chan:
             self.mod_chan = cft.get_mod_chan(l_obs)
-
         return 0
 
     def train_on_files(self, initdir, cft, is_healthy=False, new_day=True, obs_to_add=0, with_RL=True, train_mod_chan=True, on_stim=False, autosave=False):
@@ -519,8 +569,8 @@ cdef class brain_state_calculate:
         if <int>len(l_obs) <= 0:
             print "l_obs empty"
             return -1
-        success, l_of_res = self.test(l_obs, l_res)
-        l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res[self.name+'_raw'], 0)
+        success, l_of_res = self.test(l_obs, l_res, on_modulate_chan=True)
+        l_obs_koho = cft.obs_classify_mixed_res(l_obs, l_res, l_of_res[self.name], 0)
         self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy)
         return 0
 

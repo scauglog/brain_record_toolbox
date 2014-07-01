@@ -14,7 +14,8 @@ cdef class brain_state_calculate:
     cdef public int combination_to_test, history_length, koho_row, koho_col, neighbor, min_win, dist_count
     cdef public double alpha, max_weight, change_alpha_factor, tsa_alpha_start
     cdef public np.ndarray A, prevP, history, qVec
-    cdef public int change_alpha_iteration, was_bad, tsa_max_iteration, tsa_max_accuracy, raw_res, result
+    cdef public int change_alpha_iteration, was_bad, tsa_max_iteration, raw_res, result
+    cdef public double tsa_max_accuracy
 
     cpdef public int test_one_obs(self, object obs, object on_modulate_chan=*)
     cpdef int train_nets(self,object l_obs,object l_res,object cft,object with_RL=*,int obs_to_add=*,object train_mod_chan=*)

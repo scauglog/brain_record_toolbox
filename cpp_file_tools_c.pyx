@@ -364,7 +364,7 @@ cdef class cpp_file_tools:
         current_walk = 0
         for i in range(1, <int>len(l_res)):
             #when we are at the end of the walk or cue change and we walk
-            if (<int>l_res[i] != <int>l_res[i-1] or <int>l_expected_res[i] != <int>l_expected_res[i-1]) and <int>l_res[i] == 0:
+            if (<int>l_res[i] != <int>l_res[i-1] or <int>l_expected_res[i] != <int>l_expected_res[i-1]) or i+1==len(l_res):
                 if current_walk != 0:
                     if l_expected_res[i-1] == 0:
                         walk_before_cue.append(current_walk)
@@ -389,35 +389,35 @@ cdef class cpp_file_tools:
         win_point2 = 0
         success_rate1 = 0
         success_rate2 = 0
-        all_w1 =  np.hstack((w_before_cue1, w_after_cue1))
-        all_w2 =  np.hstack((w_before_cue2, w_after_cue2))
+        all_w1 = np.hstack((w_before_cue1, w_after_cue1))
+        all_w2 = np.hstack((w_before_cue2, w_after_cue2))
 
-        #long_w1 =  w_after_cue1[w_after_cue1 > long_walk]
-        #long_w2 =  w_after_cue2[w_after_cue2 > long_walk]
-        #short_w1 =  w_after_cue1[w_after_cue1 < short_walk]
-        #short_w2 =  w_after_cue2[w_after_cue2 < short_walk]
+        long_w1 = w_after_cue1[w_after_cue1 > long_walk]
+        long_w2 = w_after_cue2[w_after_cue2 > long_walk]
+        short_w1 = w_after_cue1[w_after_cue1 < short_walk]
+        short_w2 = w_after_cue2[w_after_cue2 < short_walk]
 
         ##good training have one long walk
         ##who has less long walk but at least one
-        #if 0 < <int>long_w1.shape[0] < <int>long_w2.shape[0]:
-        #    win_point1 += 1
-        #elif 0 < <int>long_w2.shape[0] < <int>long_w1.shape[0]:
-        #    win_point2 += 1
-        #elif <int>long_w1.shape[0] < 1 and <int>long_w1.shape[0] < 1:
-        #    win_point1 -= 1
-        #    win_point2 -= 1
-        #else:
-        #    win_point1 += 1
-        #    win_point2 += 2
+        if 0 < <int>long_w1.shape[0] < <int>long_w2.shape[0]:
+           win_point1 += 1
+        elif 0 < <int>long_w2.shape[0] < <int>long_w1.shape[0]:
+           win_point2 += 1
+        elif <int>long_w1.shape[0] < 1 and <int>long_w2.shape[0] < 1:
+           win_point1 -= 1
+           win_point2 -= 1
+        else:
+           win_point1 += 1
+           win_point2 += 2
 
         ##who has less short walk
-        #if <int>short_w1.shape[0] < <int>short_w2.shape[0]:
-        #    win_point1 += 1
-        #elif <int>short_w2.shape[0] < <int>short_w1.shape[0]:
-        #    win_point2 += 1
-        #else:
-        #    win_point1 += 1
-        #    win_point2 += 1
+        if <int>short_w1.shape[0] < <int>short_w2.shape[0]:
+           win_point1 += 1
+        elif <int>short_w2.shape[0] < <int>short_w1.shape[0]:
+           win_point2 += 1
+        else:
+           win_point1 += 1
+           win_point2 += 1
 
         cdef double wbc1_mean, wbc2_mean, wdc1_mean, wdc2_mean
         #before cue fav short walk
@@ -440,44 +440,44 @@ cdef class cpp_file_tools:
             win_point1 += 1
             win_point2 += 1
 
-        ##during cue fav long walk
-        ##init mean cause array.mean() return none if array is empty
-        #if <int>w_after_cue1.shape[0] > 0:
-        #    wdc1_mean = <double>w_after_cue1.mean()
-        #else:
-        #    wdc1_mean = 0
+        #during cue fav long walk
+        #init mean cause array.mean() return none if array is empty
+        if <int>w_after_cue1.shape[0] > 0:
+           wdc1_mean = <double>w_after_cue1.mean()
+        else:
+           wdc1_mean = 0
 
-        #if <int>w_after_cue2.shape[0] > 0:
-        #    wdc2_mean = <double>w_after_cue2.mean()
-        #else:
-        #    wdc2_mean = 0
+        if <int>w_after_cue2.shape[0] > 0:
+           wdc2_mean = <double>w_after_cue2.mean()
+        else:
+           wdc2_mean = 0
 
-        #if wdc1_mean > wdc2_mean:
-        #    win_point1 += 1
-        #elif wdc2_mean > wdc1_mean:
-        #    win_point2 += 1
-        #else:
-        #    win_point1 += 1
-        #    win_point2 += 1
+        if wdc1_mean > wdc2_mean:
+           win_point1 += 1
+        elif wdc2_mean > wdc1_mean:
+           win_point2 += 1
+        else:
+           win_point1 += 1
+           win_point2 += 1
 
         #who has the longest walk
         #init max cause array.max() return none if array is empty
-        #if <int>all_w1.shape[0] > 0:
-        #    all_w1_max = <int>all_w1.max()
-        #else:
-        #    all_w1_max = 0
-        #if <int>all_w2.shape[0] > 0:
-        #    all_w2_max = <int>all_w2.max()
-        #else:
-        #    all_w2_max = 0
+        if <int>all_w1.shape[0] > 0:
+           all_w1_max = <int>all_w1.max()
+        else:
+           all_w1_max = 0
+        if <int>all_w2.shape[0] > 0:
+           all_w2_max = <int>all_w2.max()
+        else:
+           all_w2_max = 0
 
-        #if all_w1_max > all_w2_max:
-        #    win_point1 += 1
-        #elif all_w2_max > all_w1_max:
-        #    win_point2 += 1
-        #else:
-        #    win_point1 += 1
-        #    win_point2 += 1
+        if all_w1_max > all_w2_max:
+           win_point1 += 1
+        elif all_w2_max > all_w1_max:
+           win_point2 += 1
+        else:
+           win_point1 += 1
+           win_point2 += 1
 
         #less walk time before cue
         if <int>w_before_cue1.sum() < <int>w_before_cue2.sum():

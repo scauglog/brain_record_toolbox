@@ -282,7 +282,7 @@ class Benchmark(object):
 
         #simulated benchmark option
         self.simulated_dir_name = '../data/RT_classifier/BMIOutputs/0423_r600/'
-        simulated_iteration = 3
+        simulated_iteration = 5
         self.simulated_files = [2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14]
         self.simulated_date = 't_0423'
         self.simulated_rat = 'r0'
@@ -326,7 +326,6 @@ class Benchmark(object):
                      ('13', range(1, 32)),
                      ('14', range(23, 48))])
                  }
-
     def benchmark_SCI_data(self, shuffle_obs=False):
         self.res_dict = {}
         for rat in self.SCI_files.keys():

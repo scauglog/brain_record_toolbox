@@ -157,7 +157,10 @@ cdef class brain_state_calculate:
         l_obs_koho = cft.obs_classify_kohonen(l_obs)
         #train networks
         self.build_networks()
-        self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)
+        cpt=0
+        while cpt < 1000:
+            cpt += len(l_res)
+            self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)
         if train_mod_chan:
             self.mod_chan = cft.get_mod_chan(l_obs)
         else:

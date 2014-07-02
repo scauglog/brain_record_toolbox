@@ -79,7 +79,7 @@ class Classifier_GUI(Tk):
 
     def create_classifier(self):
         self.disable_all_button()
-        self.my_bsc = bsc.brain_state_calculate(int(self.sb_weight_count_param.get())/int(self.sb_group_by_param.get()), settings_path="classifierSettings2.yaml")
+        self.my_bsc = bsc.brain_state_calculate(int(self.sb_weight_count_param.get())/int(self.sb_group_by_param.get()), settings_path="classifierSettings.yaml")
         self.init_cft()
         self.update_classifier()
         res = self.my_bsc.init_networks_on_files(self.init_dir, self.my_cft, train_mod_chan=self.mod_chan_on.get(), autosave=True)
@@ -118,15 +118,19 @@ class Classifier_GUI(Tk):
 
         paths = self.splitlist(file_path)
         for path in paths:
-            l_res, l_obs = self.my_cft.read_cpp_files([path], use_classifier_result=False, cut_after_cue=False,
+            l_res_cue, l_obs = self.my_cft.read_cpp_files([path], use_classifier_result=False, cut_after_cue=False,
+                                                      init_in_walk=True, on_stim=self.stim_on.get())
+            l_res_classifier, l_obs = self.my_cft.read_cpp_files([path], use_classifier_result=True, cut_after_cue=False,
                                                       init_in_walk=True, on_stim=self.stim_on.get())
             if self.quantile_shrink.get():
                 tmp_l_obs = []
                 for obs in l_obs:
                     tmp_l_obs.append(self.my_bsc.obs_to_quantiles(obs, self.mod_chan_on.get()))
                 l_obs = tmp_l_obs
+            l_obs = np.array(l_obs)
+            l_obs=np.vstack(((np.array(l_res_classifier).argmax(1)*4).T,l_obs.T)).T
             if len(l_obs) > 0:
-                self.my_cft.plot_obs(l_obs, l_res, dir_path=self.save_folder,  extra_txt=splitext(basename(path))[0], gui=True)
+                self.my_cft.plot_obs(l_obs, l_res_cue, dir_path=self.save_folder,  extra_txt=splitext(basename(path))[0], gui=True)
             else:
                 print "empty file"
 

@@ -9,12 +9,12 @@ cue: 5
 stim: 4
 
 #kohonen classifier parameter
-kc_col: 20
-kc_row: 20
+kc_col: 14
+kc_row: 7
 kc_max_weight: 5
 kc_alpha: 0.1
 kc_neighbor: 5
-kc_min_win: 20
+kc_min_win: 1
 
 #col 3 state (col start at 0)
 stop_healthy: ['1','-4','0']

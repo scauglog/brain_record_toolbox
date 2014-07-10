@@ -3,6 +3,7 @@ import numpy as np
 import kohonen_neuron_c as kn
 from matplotlib import pyplot as plt
 import settings
+from sklearn import cluster
 
 class cpp_file_tools:
     def __init__(self, chan_count, group_chan, ext_img='.png', save=False, show=False, settings_path="cppfileSettings.yaml", ion=True):
@@ -257,7 +258,10 @@ class cpp_file_tools:
             while True:
                 net = kn.Kohonen(self.kc_col, self.kc_row, l_obs[0].shape[0], self.kc_max_weight, self.kc_alpha, self.kc_neighbor, self.kc_min_win, self.ext_img, False, False)
 
-                for i in range(10):
+                cpt=0
+                #for i in range(10):
+                while cpt < 700:
+                    cpt += len(l_obs)
                     net.algo_kohonen(l_obs, False)
 
                 #create two group of neurons
@@ -295,10 +299,30 @@ class cpp_file_tools:
                 l_obs_koho = [dict_res[stop], dict_res[walk]]
                 nb_stop = len(dict_res[stop])
                 nb_walk = len(dict_res[walk])
-                print('nb stop', nb_stop, 'nb_walk', nb_walk, nb_walk/float(nb_stop))
+                print('nb stop', nb_stop, 'nb_walk', nb_walk)
                 return l_obs_koho
             else:
                 return [[], []]
+
+    @staticmethod
+    def obs_classify_ward(l_obs):
+        print('###### classify with ward ######')
+        tmp = np.array(l_obs)
+        clu = cluster.Ward(n_clusters=2)
+        res = clu.fit_predict(tmp, [0,1])
+        state1 = tmp[res < 0.5]
+        state2 = tmp[res >= 0.5]
+
+        #classifier make
+        l_obs_koho=[]
+        if state1.shape[0] > state2.shape[0]:
+            l_obs_koho.append(state1)
+            l_obs_koho.append(state2)
+        else:
+            l_obs_koho.append(state2)
+            l_obs_koho.append(state1)
+
+        return l_obs_koho
 
     @staticmethod
     def add_extra_obs(l_obs, l_res, obs_to_add, calculate_res, i, res_expected, l_obs_state):
@@ -372,27 +396,27 @@ class cpp_file_tools:
         short_w1 = w_after_cue1[w_after_cue1 < short_walk]
         short_w2 = w_after_cue2[w_after_cue2 < short_walk]
 
-        # #good training have one long walk
-        # #who has less long walk but at least one
-        if 0 < long_w1.shape[0] < long_w2.shape[0]:
-            win_point1 += 1
-        elif 0 < long_w2.shape[0] < long_w1.shape[0]:
-            win_point2 += 1
-        elif long_w1.shape[0] < 1 and long_w1.shape[0] < 1:
-            win_point1 -= 1
-            win_point2 -= 1
-        else:
-            win_point1 += 1
-            win_point2 += 2
-        #
-        # #who has less short walk
-        if short_w1.shape[0] < short_w2.shape[0]:
-            win_point1 += 1
-        elif short_w2.shape[0] < short_w1.shape[0]:
-            win_point2 += 1
-        else:
-            win_point1 += 1
-            win_point2 += 1
+        # # #good training have one long walk
+        # # #who has less long walk but at least one
+        # if 0 < long_w1.shape[0] < long_w2.shape[0]:
+        #     win_point1 += 1
+        # elif 0 < long_w2.shape[0] < long_w1.shape[0]:
+        #     win_point2 += 1
+        # elif long_w1.shape[0] < 1 and long_w1.shape[0] < 1:
+        #     win_point1 -= 1
+        #     win_point2 -= 1
+        # else:
+        #     win_point1 += 1
+        #     win_point2 += 2
+        # #
+        # # #who has less short walk
+        # if short_w1.shape[0] < short_w2.shape[0]:
+        #     win_point1 += 1
+        # elif short_w2.shape[0] < short_w1.shape[0]:
+        #     win_point2 += 1
+        # else:
+        #     win_point1 += 1
+        #     win_point2 += 1
 
         #before cue fav short walk
         #init mean cause array.mean() return none if array is empty

@@ -7,6 +7,7 @@ import numpy as np
 import kohonen_neuron_c as kn
 from matplotlib import pyplot as plt
 import settings
+from sklearn import cluster
 
 cdef class cpp_file_tools:
     def __init__(self, int chan_count, int group_chan, ext_img='.png', save=False, show=False, settings_path="cppfileSettings.yaml", ion=True):
@@ -275,7 +276,10 @@ cdef class cpp_file_tools:
             while True:
                 net = kn.Kohonen(self.kc_col, self.kc_row, <int>l_obs[0].shape[0], self.kc_max_weight, self.kc_alpha, self.kc_neighbor, self.kc_min_win, self.ext_img, False, False)
 
-                for i in range(10):
+                cpt=0
+                #for i in range(10):
+                while cpt < 700:
+                    cpt += len(l_obs)
                     net.algo_kohonen(l_obs, False)
 
                 #create two group of neurons
@@ -313,10 +317,31 @@ cdef class cpp_file_tools:
                 l_obs_koho = [dict_res[stop], dict_res[walk]]
                 nb_stop = <int>len(dict_res[stop])
                 nb_walk = <int>len(dict_res[walk])
-                print('nb stop', nb_stop, 'nb_walk', nb_walk, nb_walk/float(nb_stop))
+                print('nb stop', nb_stop, 'nb_walk', nb_walk)
                 return l_obs_koho
             else:
                 return [[], []]
+
+    @staticmethod
+    def obs_classify_ward(l_obs):
+        print('###### classify with ward ######')
+        cdef np.ndarray[DTYPE_t, ndim=2] tmp, state1, state2
+        tmp = np.array(l_obs)
+        clu = cluster.Ward(n_clusters=2)
+        res = clu.fit_predict(tmp, [0,1])
+        state1 = tmp[res < 0.5]
+        state2 = tmp[res >= 0.5]
+
+        #classifier make
+        l_obs_koho=[]
+        if <int>state1.shape[0] > <int>state2.shape[0]:
+            l_obs_koho.append(state1)
+            l_obs_koho.append(state2)
+        else:
+            l_obs_koho.append(state2)
+            l_obs_koho.append(state1)
+        print('nb stop', len(l_obs_koho[0]), 'nb_walk', len(l_obs_koho[1]))
+        return l_obs_koho
 
     @staticmethod
     def add_extra_obs(l_obs, l_res, int obs_to_add, calculate_res, int i, res_expected, l_obs_state):
@@ -396,25 +421,25 @@ cdef class cpp_file_tools:
 
         ##good training have one long walk
         ##who has less long walk but at least one
-        if 0 < <int>long_w1.shape[0] < <int>long_w2.shape[0]:
-           win_point1 += 1
-        elif 0 < <int>long_w2.shape[0] < <int>long_w1.shape[0]:
-           win_point2 += 1
-        elif <int>long_w1.shape[0] < 1 and <int>long_w2.shape[0] < 1:
-           win_point1 -= 1
-           win_point2 -= 1
-        else:
-           win_point1 += 1
-           win_point2 += 2
+        # if 0 < <int>long_w1.shape[0] < <int>long_w2.shape[0]:
+        #    win_point1 += 1
+        # elif 0 < <int>long_w2.shape[0] < <int>long_w1.shape[0]:
+        #    win_point2 += 1
+        # elif <int>long_w1.shape[0] < 1 and <int>long_w2.shape[0] < 1:
+        #    win_point1 -= 1
+        #    win_point2 -= 1
+        # else:
+        #    win_point1 += 1
+        #    win_point2 += 2
 
-        ##who has less short walk
-        if <int>short_w1.shape[0] < <int>short_w2.shape[0]:
-           win_point1 += 1
-        elif <int>short_w2.shape[0] < <int>short_w1.shape[0]:
-           win_point2 += 1
-        else:
-           win_point1 += 1
-           win_point2 += 1
+        # ##who has less short walk
+        # if <int>short_w1.shape[0] < <int>short_w2.shape[0]:
+        #    win_point1 += 1
+        # elif <int>short_w2.shape[0] < <int>short_w1.shape[0]:
+        #    win_point2 += 1
+        # else:
+        #    win_point1 += 1
+        #    win_point2 += 1
 
         cdef double wbc1_mean, wbc2_mean, wdc1_mean, wdc2_mean
         #before cue fav short walk
@@ -514,6 +539,7 @@ cdef class cpp_file_tools:
         min_walk = 3/self.block_length
         w_before_cue, w_after_cue = self.class_result(l_res, l_expected_res)
         if <int>w_before_cue.shape[0] == 0:
+        #if w_before_cue.sum()<4:
             return min(1.0, w_after_cue.sum()/float(min_walk))
         else:
             return 0

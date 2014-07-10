@@ -160,6 +160,15 @@ class Classifier_GUI(Tk):
         except:
             self.set_classifier_pca()
 
+        pca_nw0, pca_nw1 = self.classifier_pca()
+
+        plt.figure()
+        plt.scatter(pca_nw0[:, 0], pca_nw0[:, 1], marker='x', c='b', label="rest")
+        plt.scatter(pca_nw1[:, 0], pca_nw1[:, 1], marker='+', c='g', label="walk")
+        plt.legend()
+        plt.show()
+
+    def classifier_pca(self):
         nw0 = []
         nw1 = []
         for row in self.my_bsc.koho[0].network:
@@ -174,9 +183,38 @@ class Classifier_GUI(Tk):
         pca_nw0 = self.pca.transform(nw0)
         pca_nw1 = self.pca.transform(nw1)
 
+        return pca_nw0, pca_nw1
+
+    def plot_obs_pca(self):
+        file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=self.init_dir,  title="select cpp file to test the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
+        if file_path == "":
+            return -1
+        paths = self._root().tk.splitlist(file_path)
+        if self.save_folder == "" or self.save_folder == "/":
+            self.select_save_folder()
+
+        l_res, l_obs = self.my_cft.read_cpp_files(paths, use_classifier_result=False, cut_after_cue=False, init_in_walk=True)
+        success, l_of_res = self.my_bsc.test(l_obs,l_res)
+
+        try:
+            self.pca == None
+        except:
+            self.set_classifier_pca()
+        pca_nw0, pca_nw1 = self.classifier_pca()
+
+        all_res = np.array(l_of_res[self.my_bsc.name])
+        l_obs = np.array(l_obs)
+        print all_res
+        obs_rest = l_obs[all_res < 0.5]
+        obs_walk = l_obs[all_res >= 0.5]
+
+        pca_obs_rest = self.pca.transform(np.array(obs_rest))
+        pca_obs_walk = self.pca.transform(np.array(obs_walk))
         plt.figure()
-        plt.scatter(pca_nw0[:, 0], pca_nw0[:, 1], marker='x', c='b', label="rest")
-        plt.scatter(pca_nw1[:, 0], pca_nw1[:, 1], marker='x', c='g', label="walk")
+        plt.scatter(pca_obs_rest[:,0], pca_obs_rest[:,1], marker='x', c='b', label="obs rest")
+        plt.scatter(pca_obs_walk[:,0], pca_obs_walk[:,1], marker='+', c='g', label="obs walk")
+        plt.scatter(pca_nw0[:, 0], pca_nw0[:, 1], marker='o', c='b', label="rest", s=40)
+        plt.scatter(pca_nw1[:, 0], pca_nw1[:, 1], marker='v', c='g', label="walk", s=40)
         plt.legend()
         plt.show()
 
@@ -252,6 +290,9 @@ class Classifier_GUI(Tk):
 
         self.quantile_shrink.set(self.my_bsc.use_obs_quantile)
         self.t_quantile['text'] = str(self.my_bsc.qVec)
+
+    def swap_classifier(self):
+        self.my_bsc.swap()
 
     def correct_list_string(self, text):
         return text.replace(' ', ',').replace('[,', '[').replace(',]', ']').replace(',,', ',').replace(',,', ',')
@@ -352,7 +393,11 @@ class Classifier_GUI(Tk):
 
         #update classifier parameter
         self.b_update_classifier = Button(self.f_parameter, text="update classifier", command=self.update_classifier, state=DISABLED)
-        self.b_update_classifier.grid(row=9, columnspan=2)
+        self.b_update_classifier.grid(row=9, column=1)
+
+        #update classifier parameter
+        self.b_swap_classifier = Button(self.f_parameter, text="swap classifier", command=self.swap_classifier, state=DISABLED)
+        self.b_swap_classifier.grid(row=9, column=0)
 
         #train test
         self.f_train_test = LabelFrame(self.f_mainframe, padx=10, pady=10, text="Test and train parameter")
@@ -453,12 +498,16 @@ class Classifier_GUI(Tk):
         self.b_pca_classifier = Button(self.f_train_test_button, text="plot classifier pca", command=self.plot_classifier_pca, state=DISABLED)
         self.b_pca_classifier.grid(row=3, column=0, pady=10)
 
+        #plot obs pca
+        self.b_pca_obs = Button(self.f_train_test_button, text="plot obs pca", command=self.plot_obs_pca, state=DISABLED)
+        self.b_pca_obs.grid(row=4, column=0, pady=10)
+
         #train button
         self.b_train = Button(self.f_train_test_button, text="train classifier", command=self.train_classifier, state=DISABLED)
-        self.b_train.grid(row=4, column=0, pady=10)
+        self.b_train.grid(row=5, column=0, pady=10)
 
         self.b_train_test = Button(self.f_train_test_button, text="train and test", command=self.train_test, state=DISABLED)
-        self.b_train_test.grid(row=5, column=0, pady=10)
+        self.b_train_test.grid(row=6, column=0, pady=10)
 
     def enable_all_button(self):
         self.filemenu.entryconfig(2, state=NORMAL)
@@ -467,7 +516,9 @@ class Classifier_GUI(Tk):
         self.b_obs['state'] = NORMAL
         self.b_train_test['state'] = NORMAL
         self.b_update_classifier['state'] = NORMAL
+        self.b_swap_classifier['state'] = NORMAL
         self.b_pca_classifier['state'] = NORMAL
+        self.b_pca_obs['state'] = NORMAL
         self.b_set_pca_classifier['state'] = NORMAL
         print "# # DONE # #"
 
@@ -477,7 +528,9 @@ class Classifier_GUI(Tk):
         self.b_obs['state'] = DISABLED
         self.b_train_test['state'] = DISABLED
         self.b_update_classifier['state'] = DISABLED
+        self.b_swap_classifier['state'] = DISABLED
         self.b_pca_classifier['state'] = DISABLED
+        self.b_pca_obs['state'] = DISABLED
         self.b_set_pca_classifier['state'] = DISABLED
 
     def on_check_save_fig(self):

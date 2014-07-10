@@ -157,8 +157,8 @@ cdef class brain_state_calculate:
         l_obs_koho = cft.obs_classify_kohonen(l_obs)
         #train networks
         self.build_networks()
-        cpt=0
-        while cpt < 1000:
+        cpt = 0
+        while cpt < 700:
             cpt += len(l_res)
             self.simulated_annealing(l_obs, l_obs_koho, l_res, self.tsa_alpha_start, self.tsa_max_iteration, self.tsa_max_accuracy, over_train_walk=True)
         if train_mod_chan:
@@ -180,6 +180,9 @@ cdef class brain_state_calculate:
         if autosave:
             self.save_obj(files[-1]+str(time.time())+'.pyObj')
         return 0
+
+    def swap(self):
+        self.koho[0], self.koho[1] = self.koho[1], self.koho[0]
 
     def init_test(self, HMM = True):
         #initilise test for live processing
@@ -214,7 +217,9 @@ cdef class brain_state_calculate:
 
         #find the best distance of the obs to each network
         for k in range(<int>len(self.koho)):
-            #dist_res[k] = self.koho[k].find_mean_best_dist(obs, self.dist_count)
+            # best_ns.append()
+            # best_ns[k]=self.koho[k].find_best_X_neurons(obs, self.dist_count)
+            # dist_res[k] = self.koho[k].find_mean_best_dist(obs, self.dist_count)
             #we add extra neurons to best_ns in order to remove null probability
             tmp_ns = self.koho[k].find_best_X_neurons(obs, self.dist_count)
             best_ns += tmp_ns
@@ -228,6 +233,7 @@ cdef class brain_state_calculate:
             #flatten list
             #best_ns = [item for sublist in best_ns for item in sublist]
 
+            #prob_res = self.compute_network_accuracy_p(best_ns,obs)
             prob_res = self.compute_network_accuracy(best_ns, dist_res, obs)
 
             #compute result with HMM

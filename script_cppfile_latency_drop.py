@@ -6,7 +6,7 @@ import numpy as np
 initdir = "C:\\"
 root = Tkinter.Tk()
 root.withdraw()
-file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=initdir,  title="select cpp file to train the classifier", filetypes=[('all files', '.*'), ('text files', '.txt')])
+file_path = tkFileDialog.askopenfilename(multiple=True, initialdir=initdir,  title="select cpp file", filetypes=[('all files', '.*'), ('text files', '.txt')])
 paths = root.tk.splitlist(file_path)
 mean = []
 std = []

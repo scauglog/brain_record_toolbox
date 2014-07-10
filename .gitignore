@@ -4,6 +4,7 @@
 *.fig
 *.eps
 *.jpeg
+*.ai
 
 *.mat
 *.csv
@@ -13,4 +14,6 @@
 *.pyd
 *.so
 
+*.prof
 **/.idea/
+**/build/

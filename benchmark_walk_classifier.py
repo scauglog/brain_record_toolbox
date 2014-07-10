@@ -350,7 +350,7 @@ class Benchmark(object):
 
                     #get obs
                     files = self.my_cft.convert_to_filename_list(dir_name, fulldate, self.SCI_files[rat][date][n:n+1], self.SCI_corename)
-                    l_res, l_obs = self.my_cft.read_cpp_files(files, use_classifier_result=False, cut_after_cue=False)
+                    l_res, l_obs = self.my_cft.read_cpp_files(files, use_classifier_result=False, cut_after_cue=True)
                     #if the trial is too short or have no neuron modulated we don't train
                     if len(l_obs) > self.SCI_min_obs and np.array(l_obs).sum() > 0:
                         if shuffle_obs:
@@ -478,7 +478,7 @@ class Benchmark_Koho(Benchmark):
         self.classifier.init_networks(files, self.my_cft, train_mod_chan=True)
 
     def test_network_with_files(self, files):
-        l_res, l_obs = self.my_cft.read_cpp_files(files, use_classifier_result=False, cut_after_cue=False)
+        l_res, l_obs = self.my_cft.read_cpp_files(files, use_classifier_result=False, cut_after_cue=True)
         return self.test_network_with_obs(l_obs, l_res)
 
     def test_network_with_obs(self, l_obs, l_res):
@@ -487,7 +487,7 @@ class Benchmark_Koho(Benchmark):
         return l_of_res
 
     def train_with_file(self, files, new_day):
-        l_res, l_obs = self.my_cft.read_cpp_files(files, use_classifier_result=False, cut_after_cue=False)
+        l_res, l_obs = self.my_cft.read_cpp_files(files, use_classifier_result=False, cut_after_cue=True)
         self.train_with_obs(l_obs, l_res, new_day)
 
     def train_with_obs(self, l_obs, l_res, new_day):

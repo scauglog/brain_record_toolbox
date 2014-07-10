@@ -193,9 +193,9 @@ class Signal_processing:
         return y
 
     #usefull to load csv file without using import csv
-    def load_csv(self, filename):
+    def load_csv(self, filename, delimiter=',', quotechar='"'):
         csvfile = open(filename, 'rb')
-        return csv.reader(csvfile, delimiter=',', quotechar='"')
+        return csv.reader(csvfile, delimiter=delimiter, quotechar=quotechar)
 
     #put exported vicon data (csv file) into a dictionary
     def vicon_extract(self, data, vicon_dict={}):
@@ -343,8 +343,8 @@ class Signal_processing:
                 if not len(end) == 0:
                     end = end[0]
                     start = times_start[i]
-                    if end-start < 1:
-                        steps_time.append([start, end])
+                    #if end-start < 1:
+                    steps_time.append([start, end])
         return steps_time
 
     #return list of complete step (with swing and stance phase)
@@ -352,7 +352,7 @@ class Signal_processing:
         full_step=[]
         for step_stance in stance_steps_time:
             for step_swing in swing_steps_time:
-                if step_stance[1] == step_swing[0] and step_swing[0]-step_stance[0] < 1:
+                if step_stance[1] == step_swing[0]:
                     full_step.append([step_stance[0], step_stance[1], step_swing[1]])
                     break
         return full_step

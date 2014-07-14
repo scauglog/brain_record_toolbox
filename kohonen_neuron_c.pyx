@@ -446,16 +446,16 @@ cdef class Kohonen:
 
     #plot x(=spike_count) spike and color them according to the groups they belongs to
     def plot_spikes_classified(self, spikes_values, spike_count, threshold_template, extra_text=''):
-        s = copy.copy(spikes_values).tolist()
-        if spike_count > len(s):
-            spike_count = len(s)
+        #s = copy.copy(spikes_values).tolist()
+        if spike_count > spikes_values.shape[0]:
+            spike_count = spikes_values.shape[0]
 
         fig = plt.figure()
         plt.suptitle('spikes classified' + extra_text)
-        for i in range(spike_count):
+        sample = rnd.sample(xrange(spikes_values.shape[0]),spike_count)
+        for r in sample:
             #select a spike randomly
-            r = rnd.randrange(len(s))
-            value = s.pop(r)
+            value = spikes_values[r]
 
             best_gpe = self.find_best_group(value, threshold_template)
             if best_gpe is None:
@@ -463,7 +463,7 @@ cdef class Kohonen:
             else:
                 color_gpe = best_gpe.color
 
-            plt.plot(range(len(value)), value, color=color_gpe)
+            plt.plot(value, color=color_gpe)
 
         if self.save:
             plt.savefig('spikes_classified' + extra_text + self.img_ext, bbox_inches='tight')

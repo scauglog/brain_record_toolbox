@@ -167,7 +167,7 @@ class Signal_processing:
         print('\n## kohonen ##')
 
         koho_map = nn.Kohonen(col, row, weight_count, max_weight, alpha, neighbor, min_win, self.img_ext, self.save_img,
-                         self.show)
+                         self.show, rnd.random())
         koho_map.algo_kohonen(spikes_values)
 
         print('# find best neurons #')

@@ -3,7 +3,7 @@ clear all;
 clc;
 
 dir_name='../../data/r415/'
-load(strcat(dir_name,'r415_130926.mat'))
+load(strcat(dir_name,'r415_131009.mat'))
 load(strcat(dir_name,'fech.mat'))
 
 signal=d;

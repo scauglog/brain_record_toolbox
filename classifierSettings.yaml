@@ -7,8 +7,8 @@ default_res: [0,0]
 test_all: False
 combination_to_test: 50
 #HMM matrix
-A: [[0.99, 0.01],[0.1,0.9]]
-history_length: 1
+A: [[0.99, 0.01],[0.01,0.99]]
+history_length: 3
 
 #kohonen parameter
 alpha: 0.01
